@@ -11,7 +11,7 @@
 # importing random forest classifier from assemble module
 from sklearn.ensemble import RandomForestClassifier
 import pandas as pd
-from sklearn.preprocessing import PolynomialFeatures
+from sklearn.preprocessing import PolynomialFeatures, MinMaxScaler
 from sklearn import metrics  
 from sklearn import datasets
 from sklearn.linear_model import LogisticRegression
@@ -22,21 +22,26 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 data = pd.read_csv("streaming.csv")
-data = data.drop(['version'], axis=1)
 #TODO: Automate data cleaning
-# - Regex for alpha after newline
+# - Regex for alpha after newline: [^0-9^,^"]+ and then ctrl alt enter
 # - Find multistage and make something else
 data.stage = data.stage.apply(pd.to_numeric,errors='coerce')
+data.paragraph = data.paragraph.apply(lambda x: len(x))
 data = data.dropna()
 
+scaler = MinMaxScaler()
 
+# Fit and transform the data
+data = pd.DataFrame(scaler.fit_transform(data), columns=data.columns)
+
+print(data)
 
 y = data.loc[:,"stage"].astype(int)
 
 y.fillna(0)
 
 X = data[["scarcity", "nonuniform_progress", "performance_constraints", 
-"user heterogeneity", "cognitive", "external", "internal", "coordination", "technical", "demand"]]
+"user heterogeneity", "cognitive", "external", "internal", "coordination", "technical", "demand", "paragraph"]]
 
 #replace nans with means
 # Splitting arrays or matrices into random train and test subsets
