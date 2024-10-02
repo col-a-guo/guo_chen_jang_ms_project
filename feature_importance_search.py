@@ -21,17 +21,22 @@ from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
 import numpy as np
 
-data = pd.read_csv("out.csv")
-data = data.drop(['paragraph', 'version', 'ind'], axis=1)
-data = data.apply(pd.to_numeric,errors='coerce')
-data.fillna(data.mean(), inplace=True)
+data = pd.read_csv("streaming.csv")
+data = data.drop(['version'], axis=1)
+#TODO: Automate data cleaning
+# - Regex for alpha after newline
+# - Find multistage and make something else
+data.stage = data.stage.apply(pd.to_numeric,errors='coerce')
+data = data.dropna()
+
+
 
 y = data.loc[:,"stage"].astype(int)
 
-y.fillna(data.mean(), inplace=True)
+y.fillna(0)
 
-X = data[["scarcity", "nonuniform progress", "performance constraints", 
-"user heterogeneity", "cognitive", "external", "internal", "coordination", "transactional", "technical", "demand"]]
+X = data[["scarcity", "nonuniform_progress", "performance_constraints", 
+"user heterogeneity", "cognitive", "external", "internal", "coordination", "technical", "demand"]]
 
 #replace nans with means
 # Splitting arrays or matrices into random train and test subsets
@@ -39,7 +44,6 @@ X = data[["scarcity", "nonuniform progress", "performance constraints",
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.20)
 
 
-print(y_train)
 # creating dataframe of IRIS dataset
 
 
