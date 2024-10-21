@@ -25,6 +25,7 @@ from sklearn.ensemble import StackingClassifier
 from sklearn.model_selection import train_test_split
 from sklearn import compose, linear_model, metrics, pipeline, preprocessing
 from imblearn.over_sampling import RandomOverSampler
+from imblearn.under_sampling import RandomUnderSampler
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -69,16 +70,15 @@ X = pd.DataFrame(scaler.fit_transform(X), columns=X.columns)
 
 # Begin averaging loop
 acc_array = []
-loop_count = 100
+loop_count = 1000
 for randomloop in range(loop_count):
+    
     ros = RandomOverSampler(random_state=randomloop)
     X, y = ros.fit_resample(X, y)
 
-    print(y)
-
     #replace nans with means
     # Splitting arrays or matrices into random train and test subsets
-    # i.e. 70 % training dataset and 30 % test datasets
+    # i.e. 80 % training dataset and 20 % test datasets
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.20)
 
 
@@ -121,9 +121,13 @@ for randomloop in range(loop_count):
     # clf2 = LogisticRegression(penalty='l2')
 
     # clf2.fit(clf.predict(poly_X_train).reshape(-1,1), z_train.reshape(-1,1))
-    
+
+    rus = RandomUnderSampler(sampling_strategy =  {0: 40, 1: 5, 2: 5})
+    X_test, y_test = rus.fit_resample(X_test, y_test)
+
     # performing predictions on the test dataset
     y_pred = clf.predict(X_test)
+
 
     print(metrics.classification_report(y_test, y_pred))
     acc_array.append(metrics.accuracy_score(y_test, y_pred))
@@ -132,3 +136,6 @@ print("MEAN ACCURACY")
 print(np.mean(acc_array))
 print("STDEV:")
 print(np.std(acc_array))
+
+#Note to self: Non-oversampled version was 72% after 30 runs
+#New version is 77.5%, stdev 6.1% (100 runs)
