@@ -68,7 +68,7 @@ X = pd.DataFrame(scaler.fit_transform(X), columns=X.columns)
 
 
 # Begin averaging loop
-total_accuracy = 0
+acc_array = []
 loop_count = 100
 for randomloop in range(loop_count):
     ros = RandomOverSampler(random_state=randomloop)
@@ -126,7 +126,9 @@ for randomloop in range(loop_count):
     y_pred = clf.predict(X_test)
 
     print(metrics.classification_report(y_test, y_pred))
-    total_accuracy+=metrics.accuracy_score(y_test, y_pred)
+    acc_array.append(metrics.accuracy_score(y_test, y_pred))
 
 print("MEAN ACCURACY")
-print(total_accuracy/loop_count)
+print(np.mean(acc_array))
+print("STDEV:")
+print(np.std(acc_array))
