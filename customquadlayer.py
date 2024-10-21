@@ -116,4 +116,4 @@ for i, feature in enumerate(["scarcity", "nonuniform_progress", "performance_con
 # performing predictions on the test dataset
 y_pred = clf.predict(X_test)
 
-print("ACCURACY OF THE MODEL:", metrics.accuracy_score(y_test, y_pred))
+print("ACCURACY OF THE MODEL:", metrics.classification_report(y_test, y_pred))

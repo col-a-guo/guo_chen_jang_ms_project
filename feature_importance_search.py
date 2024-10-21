@@ -82,7 +82,7 @@ importances = clf.feature_importances_
  
 
 # using metrics module for accuracy calculation
-print("ACCURACY OF THE MODEL:", metrics.accuracy_score(y_test, y_pred))
+print("ACCURACY OF THE MODEL:", metrics.classification_report(y_test, y_pred))
 
 label = LabelEncoder()
 data['stage'] = label.fit_transform(data['stage'])
@@ -104,5 +104,5 @@ for iter, pipe in enumerate(results['estimator']):
     for i in range(X.shape[1]):
         print('Column: %s, Selected %s, Rank: %d' %
             (X.columns[i], pipe['Feature Selection'].support_[i], pipe['Feature Selection'].ranking_[i]))
-        
+
 print(n_scores)
