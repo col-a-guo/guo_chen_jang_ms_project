@@ -15,6 +15,7 @@ from sklearn.preprocessing import PolynomialFeatures
 from sklearn import metrics  
 from sklearn import datasets
 from sklearn.linear_model import LogisticRegression
+from sklearn.inspection import permutation_importance
 
 from sklearn.svm import LinearSVC
 from sklearn.preprocessing import MinMaxScaler
@@ -93,6 +94,17 @@ clf = StackingClassifier(
 )
 
 clf.fit(X_train, y_train)
+
+# Calculate permutation importance
+result = permutation_importance(clf, X, y, n_repeats=10, random_state=42)
+
+# Access the importance scores
+importances = result.importances_mean
+
+# Print the importance scores
+for i, feature in enumerate(["scarcity", "nonuniform_progress", "performance_constraints", 
+"user heterogeneity", "cognitive", "external", "internal", "coordination", "technical", "demand", "paragraph"]):
+    print(f"{feature}: {importances[i]}")
 
 # z_train = y_train
 # z_test = y_test
