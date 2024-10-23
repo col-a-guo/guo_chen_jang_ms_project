@@ -116,7 +116,7 @@ for randomloop in range(loop_count):
 
     # Print the importance scores
     for i, feature in enumerate(["scarcity", "nonuniform_progress", "performance_constraints", 
-    "user heterogeneity", "cognitive", "external", "internal", "coordination", "technical", "demand", "paragraph"]):
+    "user heterogeneity", "cognitive", "external", "internal", "coordination", "technical", "demand", "article\nlength"]):
         importance_array[i].append(importances[i])
 
     # z_train = y_train
