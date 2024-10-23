@@ -63,7 +63,7 @@ y = data.loc[:,"stage"].astype(int)
 y.fillna(0)
 
 X = data[["scarcity", "nonuniform_progress", "performance_constraints", 
-"user_heterogeneity", "cognitive", "external", "internal", "coordination", "technical", "demand", "paragraph"]]
+"user_heterogeneity", "cognitive", "external", "internal", "coordination", "technical", "demand", "length_approx"]]
 
 # Fit and transform the data
 X = pd.DataFrame(scaler.fit_transform(X), columns=X.columns)
@@ -74,7 +74,7 @@ importance_array = [[] for i in range(11)]
 
 # Begin averaging loop
 acc_array = []
-loop_count = 1000
+loop_count = 100
 for randomloop in range(loop_count):
     
     ros = RandomOverSampler(random_state=randomloop)
@@ -126,7 +126,7 @@ for randomloop in range(loop_count):
 
     # clf2.fit(clf.predict(poly_X_train).reshape(-1,1), z_train.reshape(-1,1))
 
-    rus = RandomUnderSampler(sampling_strategy =  {0: 2, 1: 7, 2: 3})
+    rus = RandomUnderSampler(sampling_strategy =  {0: 5, 1: 10, 2: 6})
     X_test, y_test = rus.fit_resample(X_test, y_test)
 
     # performing predictions on the test dataset
