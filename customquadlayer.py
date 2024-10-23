@@ -153,7 +153,7 @@ plt.xlabel("Feature")
 plt.ylabel("Importance")
 plt.errorbar(x, y, y_std, fmt='.', color='Black', elinewidth=2,capthick=10,errorevery=1, alpha=0.5, ms=4, capsize = 2)
 plt.xticks([i for i in range(11)], ["scarcity", "nonuniform\nprogress", "performance\nconstraints", 
-                                    "user\nheterogeneity", "cognitive", "external", "internal", "coordination", "technical", "demand", "paragraph"])
+                                    "user\nheterogeneity", "cognitive", "external", "internal", "coordination", "technical", "demand", "article\nlength"])
 
 plt.show()
 
