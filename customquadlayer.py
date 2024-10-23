@@ -50,7 +50,7 @@ class MyStackingRegressor(StackingRegressor):
             )
         return names, estimators
 
-data = pd.read_csv("streaming.csv")
+data = pd.read_csv("multichannel.csv")
 data.stage = data.stage.apply(pd.to_numeric,errors='coerce')
 data.paragraph = data.paragraph.apply(lambda x: len(x))
 data = data.dropna()
@@ -63,13 +63,14 @@ y = data.loc[:,"stage"].astype(int)
 y.fillna(0)
 
 X = data[["scarcity", "nonuniform_progress", "performance_constraints", 
-"user heterogeneity", "cognitive", "external", "internal", "coordination", "technical", "demand", "paragraph"]]
+"user_heterogeneity", "cognitive", "external", "internal", "coordination", "technical", "demand", "paragraph"]]
 
 # Fit and transform the data
 X = pd.DataFrame(scaler.fit_transform(X), columns=X.columns)
 
 #["scarcity", "nonuniform_progress", "performance_constraints", "user heterogeneity", "cognitive", "external", "internal", "coordination", "technical", "demand", "paragraph"]
 importance_array = [[] for i in range(11)]
+
 
 # Begin averaging loop
 acc_array = []
@@ -82,7 +83,7 @@ for randomloop in range(loop_count):
     #replace nans with means
     # Splitting arrays or matrices into random train and test subsets
     # i.e. 80 % training dataset and 20 % test datasets
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.20)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.30)
 
 
     estimators = [
@@ -125,7 +126,7 @@ for randomloop in range(loop_count):
 
     # clf2.fit(clf.predict(poly_X_train).reshape(-1,1), z_train.reshape(-1,1))
 
-    rus = RandomUnderSampler(sampling_strategy =  {0: 60, 1: 10, 2: 16})
+    rus = RandomUnderSampler(sampling_strategy =  {0: 2, 1: 7, 2: 3})
     X_test, y_test = rus.fit_resample(X_test, y_test)
 
     # performing predictions on the test dataset
