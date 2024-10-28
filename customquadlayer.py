@@ -12,13 +12,13 @@
 from sklearn.ensemble import RandomForestClassifier
 import pandas as pd
 from sklearn.preprocessing import PolynomialFeatures
-from sklearn import metrics  
+from sklearn import metrics
 from sklearn import datasets
 from sklearn.linear_model import LogisticRegression
 from sklearn.inspection import permutation_importance
 
 from sklearn.svm import LinearSVC
-from sklearn.preprocessing import MinMaxScaler
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from sklearn.pipeline import make_pipeline
 from sklearn.ensemble import StackingRegressor
 from sklearn.ensemble import StackingClassifier
@@ -52,7 +52,6 @@ class MyStackingRegressor(StackingRegressor):
 
 data = pd.read_csv("multichannel.csv")
 data.stage = data.stage.apply(pd.to_numeric,errors='coerce')
-data.paragraph = data.paragraph.apply(lambda x: len(x))
 data = data.dropna()
 
 scaler = MinMaxScaler()
@@ -65,8 +64,11 @@ y.fillna(0)
 X = data[["scarcity", "nonuniform_progress", "performance_constraints", 
 "user_heterogeneity", "cognitive", "external", "internal", "coordination", "technical", "demand", "length_approx"]]
 
+
+
 # Fit and transform the data
 X = pd.DataFrame(scaler.fit_transform(X), columns=X.columns)
+
 
 #["scarcity", "nonuniform_progress", "performance_constraints", "user heterogeneity", "cognitive", "external", "internal", "coordination", "technical", "demand", "paragraph"]
 importance_array = [[] for i in range(11)]
@@ -126,7 +128,7 @@ for randomloop in range(loop_count):
 
     # clf2.fit(clf.predict(poly_X_train).reshape(-1,1), z_train.reshape(-1,1))
 
-    rus = RandomUnderSampler(sampling_strategy =  {0: 5, 1: 10, 2: 6})
+    rus = RandomUnderSampler(sampling_strategy =  {0: 7, 1: 20, 2: 11})
     X_test, y_test = rus.fit_resample(X_test, y_test)
 
     # performing predictions on the test dataset
