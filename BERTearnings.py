@@ -10,12 +10,12 @@ def tokenize_function(examples):
 
 
 tokenized_datasets = dataset.map(tokenize_function, batched=True)
-small_train_dataset = tokenized_datasets["train"].shuffle(seed=42).select(range(100))
-small_eval_dataset = tokenized_datasets["test"].shuffle(seed=42).select(range(100))
+small_train_dataset = tokenized_datasets["train"].shuffle(seed=1).select(range(100))
+small_eval_dataset = tokenized_datasets["test"].shuffle(seed=1).select(range(100))
 
 from transformers import AutoModelForSequenceClassification
 
-model = AutoModelForSequenceClassification.from_pretrained("google-bert/bert-base-cased", num_labels=5)
+model = AutoModelForSequenceClassification.from_pretrained("google-bert/bert-base-cased", num_labels=2)
 from transformers import TrainingArguments
 
 training_args = TrainingArguments(output_dir="test_trainer")
