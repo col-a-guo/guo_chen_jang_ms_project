@@ -1,39 +1,50 @@
-from transformers import AutoTokenizer
-
-tokenizer = AutoTokenizer.from_pretrained("google-bert/bert-base-cased")
+from transformers import AutoTokenizer, AutoModelForSequenceClassification, Trainer, TrainingArguments
 from datasets import load_dataset
+import numpy as np
+import evaluate
+import torch
 
-dataset = load_dataset('csv', data_files={'train': "train_set_stream.csv",'test': "test_set_stream.csv"})
+# Load the tokenizer
+tokenizer = AutoTokenizer.from_pretrained("google-bert/bert-base-cased")
 
+ogpath = "multichannel.csv"  
+# Load the dataset
+dataset = load_dataset('csv', data_files={'train': "train_" + ogpath, 'test': "test_" + ogpath})
+
+# Function to tokenize the text
 def tokenize_function(examples):
     return tokenizer(examples["paragraph"], padding="max_length", truncation=True)
 
-
+# Tokenize the datasets
 tokenized_datasets = dataset.map(tokenize_function, batched=True)
-small_train_dataset = tokenized_datasets["train"].shuffle(seed=1).select(range(100))
-small_eval_dataset = tokenized_datasets["test"].shuffle(seed=1).select(range(100))
 
-from transformers import AutoModelForSequenceClassification
+# Shuffle and select a small subset of the dataset
+small_train_dataset = tokenized_datasets["train"]
+small_eval_dataset = tokenized_datasets["test"]
 
-model = AutoModelForSequenceClassification.from_pretrained("google-bert/bert-base-cased", num_labels=2)
-from transformers import TrainingArguments
+#convert to float??
+small_train_dataset = small_train_dataset.map(lambda x: {'labels': torch.tensor(x['labels'], dtype=torch.float)}, remove_columns=['labels'])
+small_eval_dataset = small_eval_dataset.map(lambda x: {'labels': torch.tensor(x['labels'], dtype=torch.float)}, remove_columns=['labels'])
 
-training_args = TrainingArguments(output_dir="test_trainer")
+# Load the model for regression (change num_labels to 1 for regression)
+model = AutoModelForSequenceClassification.from_pretrained("google-bert/bert-base-cased", num_labels=1)
 
-import numpy as np
-import evaluate
+# Define training arguments
+training_args = TrainingArguments(
+    output_dir="test_trainer",
+    evaluation_strategy="epoch",
+)
 
-metric = evaluate.load("accuracy")
+# Load evaluation metric (mean squared error for regression)
+metric = evaluate.load("mse")
 
+# Function to compute metrics
 def compute_metrics(eval_pred):
     logits, labels = eval_pred
-    predictions = np.argmax(logits, axis=-1)
+    predictions = logits.squeeze()  # For regression, squeeze to remove unnecessary dimensions
     return metric.compute(predictions=predictions, references=labels)
 
-from transformers import TrainingArguments, Trainer
-
-training_args = TrainingArguments(output_dir="test_trainer", eval_strategy="epoch")
-
+# Create Trainer
 trainer = Trainer(
     model=model,
     args=training_args,
@@ -42,4 +53,5 @@ trainer = Trainer(
     compute_metrics=compute_metrics,
 )
 
+# Train the model
 trainer.train()
