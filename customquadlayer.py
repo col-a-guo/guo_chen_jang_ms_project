@@ -56,20 +56,91 @@ data = data.dropna()
 
 scaler = MinMaxScaler()
 
-
 y = data.loc[:,"stage"].astype(int)
 
 y.fillna(0)
 
-labels = ["scarcity", "nonuniform_progress", "performance_constraints", 
-"user_heterogeneity", "cognitive", "external", "internal", "coordination", "technical", "demand"]
-X = data[["scarcity", "nonuniform_progress", "performance_constraints", 
-"user_heterogeneity", "cognitive", "external", "internal", "coordination", "technical", "demand"]]
 
+labels = [
+    "scarcity",
+    "nonuniform_progress",
+    "performance_constraints",
+    "user_heterogeneity",
+    "cognitive",
+    "external",
+    "internal",
+    "coordination",
+    "transactional",
+    "technical",
+    "demand",
+    "2500partner",
+    "singlepartner",
+    "content production",
+    "data center/storage",
+    "Internet infra",
+    "content distribution",
+    "browsers, apps & smart devices",
+    "advertising",
+    "end users",
+    "external partners",
+    "substitutional partners", 
+    "length_approx"]
+
+X = data[labels]
 
 
 # Fit and transform the data
+
+X['number_of_types'] = X.drop(columns=['length_approx']).sum(axis=1)
+
+labels.append("number_of_types")
+
+mean = X['length_approx'].mean()
+std_dev = X['length_approx'].std()
+
+# Apply standard deviation scaling
+X['length_approx'] = (X['length_approx'] - mean) / std_dev
+
+#Shift values up if there are any negatives
+min_value = X['length_approx'].min()
+if min_value < 0:
+    X['length_approx'] += abs(min_value)
+
+#round to nearest
+
 X = pd.DataFrame(scaler.fit_transform(X), columns=X.columns)
+
+X['length_approx'] = X['length_approx'].round()
+X['number_of_types'] = X['number_of_types'].round()
+
+# Existing DataFrame X
+X['dummy_variable1'] = np.random.uniform(0, 1, size=len(X))
+X['dummy_variable2'] = np.random.uniform(0, 1, size=len(X))
+X['dummy_variable3'] = np.random.uniform(0, 1, size=len(X))
+X['dummy_variable4'] = np.random.uniform(0, 1, size=len(X))
+X['dummy_variable5'] = np.random.uniform(0, 1, size=len(X))
+# Define the labels to keep
+labels = [
+    "scarcity", 
+    "nonuniform_progress", 
+    "performance_constraints",  
+    "user_heterogeneity", 
+    "cognitive", 
+    "external", 
+    "internal", 
+    "coordination", 
+    "technical", 
+    "demand", 
+    "length_approx",
+    "number_of_types",
+    "dummy_variable1",
+    "dummy_variable2",
+    "dummy_variable3",
+]
+
+# Drop all columns not in the labels_to_keep list
+X = X[labels]
+
 
 
 #["scarcity", "nonuniform_progress", "performance_constraints", "user heterogeneity", "cognitive", "external", "internal", "coordination", "technical", "demand", "paragraph"]
@@ -92,9 +163,9 @@ for randomloop in range(loop_count):
 
     estimators = [
         ('rf', RandomForestClassifier(n_estimators=10, random_state=randomloop)),
-        ('svr', make_pipeline(PolynomialFeatures(degree=2),
+        ('mnlr', make_pipeline(PolynomialFeatures(degree=2),
                             MinMaxScaler(),
-                            LinearSVC(random_state=42)))
+                            LogisticRegression(random_state=1)))
     ]
     #mnlr = linear_model.LogisticRegression(penalty='l2')
     #multinomial logistic regression
@@ -113,14 +184,13 @@ for randomloop in range(loop_count):
     clf.fit(X_train, y_train)
 
     # Calculate permutation importance
-    result = permutation_importance(clf, X, y, n_repeats=10, random_state=42)
+    result = permutation_importance(clf, X, y, n_repeats=8, random_state=1)
 
     # Access the importance scores
     importances = result.importances_mean
 
     # Print the importance scores
-    for i, feature in enumerate(["scarcity", "nonuniform_progress", "performance_constraints", 
-    "user heterogeneity", "cognitive", "external", "internal", "coordination", "technical", "demand"]):
+    for i, feature in enumerate(labels):
         importance_array[i].append(importances[i])
 
     # z_train = y_train
@@ -145,9 +215,12 @@ print(metrics.classification_report(y_test,y_pred))
 mean_acc = np.mean(acc_array)
 stdev_acc = np.std(acc_array)
 
-x= [i for i in range(11)]
+x= [i for i in range(len(labels))]
 y_std = [np.std(implist) for implist in importance_array]
 y= [np.mean(implist) for implist in importance_array]
+
+
+formatted_labels = [label.replace('_', '\n').replace(' ', '\n') for label in labels]
 
 plt.figure(figsize=(20, 8))
 plt.bar(x,y)
@@ -156,8 +229,7 @@ plt.title(f"Note: Accuracy averaged {str(mean_acc)[:4]} with stdev {str(stdev_ac
 plt.xlabel("Feature")
 plt.ylabel("Importance")
 plt.errorbar(x, y, y_std, fmt='.', color='Black', elinewidth=2,capthick=10,errorevery=1, alpha=0.5, ms=4, capsize = 2)
-plt.xticks([i for i in range(len(labels))], ["scarcity", "nonuniform\nprogress", "performance\nconstraints", 
-                                    "user\nheterogeneity", "cognitive", "external", "internal", "coordination", "technical", "demand"])
+plt.xticks([i for i in range(len(labels))], formatted_labels)
 
 plt.show()
 
