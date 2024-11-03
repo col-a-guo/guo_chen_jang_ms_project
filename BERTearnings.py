@@ -5,7 +5,7 @@ import evaluate
 import torch
 
 # Load the tokenizer
-tokenizer = AutoTokenizer.from_pretrained("google-bert/bert-base-cased")
+tokenizer = AutoTokenizer.from_pretrained("pborchert/BusinessBERT")
 
 ogpath = "multichannel.csv"  
 # Load the dataset
@@ -23,7 +23,7 @@ small_train_dataset = tokenized_datasets["train"]
 small_eval_dataset = tokenized_datasets["test"]
 
 # Load the model for regression (change num_labels to 1 for regression)
-model = AutoModelForSequenceClassification.from_pretrained("google-bert/bert-base-cased", num_labels=1)
+model = AutoModelForSequenceClassification.from_pretrained("pborchert/BusinessBERT", num_labels=1)
 
 # Define training arguments
 training_args = TrainingArguments(
