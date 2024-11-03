@@ -22,10 +22,6 @@ tokenized_datasets = dataset.map(tokenize_function, batched=True)
 small_train_dataset = tokenized_datasets["train"]
 small_eval_dataset = tokenized_datasets["test"]
 
-#convert to float??
-small_train_dataset = small_train_dataset.map(lambda x: {'labels': torch.tensor(x['labels'], dtype=torch.float)}, remove_columns=['labels'])
-small_eval_dataset = small_eval_dataset.map(lambda x: {'labels': torch.tensor(x['labels'], dtype=torch.float)}, remove_columns=['labels'])
-
 # Load the model for regression (change num_labels to 1 for regression)
 model = AutoModelForSequenceClassification.from_pretrained("google-bert/bert-base-cased", num_labels=1)
 

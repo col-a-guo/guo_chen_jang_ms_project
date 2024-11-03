@@ -61,8 +61,10 @@ y = data.loc[:,"stage"].astype(int)
 
 y.fillna(0)
 
+labels = ["scarcity", "nonuniform_progress", "performance_constraints", 
+"user_heterogeneity", "cognitive", "external", "internal", "coordination", "technical", "demand"]
 X = data[["scarcity", "nonuniform_progress", "performance_constraints", 
-"user_heterogeneity", "cognitive", "external", "internal", "coordination", "technical", "demand", "length_approx"]]
+"user_heterogeneity", "cognitive", "external", "internal", "coordination", "technical", "demand"]]
 
 
 
@@ -71,7 +73,7 @@ X = pd.DataFrame(scaler.fit_transform(X), columns=X.columns)
 
 
 #["scarcity", "nonuniform_progress", "performance_constraints", "user heterogeneity", "cognitive", "external", "internal", "coordination", "technical", "demand", "paragraph"]
-importance_array = [[] for i in range(11)]
+importance_array = [[] for i in range(len(labels))]
 
 
 # Begin averaging loop
@@ -118,7 +120,7 @@ for randomloop in range(loop_count):
 
     # Print the importance scores
     for i, feature in enumerate(["scarcity", "nonuniform_progress", "performance_constraints", 
-    "user heterogeneity", "cognitive", "external", "internal", "coordination", "technical", "demand", "article\nlength"]):
+    "user heterogeneity", "cognitive", "external", "internal", "coordination", "technical", "demand"]):
         importance_array[i].append(importances[i])
 
     # z_train = y_train
@@ -154,8 +156,8 @@ plt.title(f"Note: Accuracy averaged {str(mean_acc)[:4]} with stdev {str(stdev_ac
 plt.xlabel("Feature")
 plt.ylabel("Importance")
 plt.errorbar(x, y, y_std, fmt='.', color='Black', elinewidth=2,capthick=10,errorevery=1, alpha=0.5, ms=4, capsize = 2)
-plt.xticks([i for i in range(11)], ["scarcity", "nonuniform\nprogress", "performance\nconstraints", 
-                                    "user\nheterogeneity", "cognitive", "external", "internal", "coordination", "technical", "demand", "article\nlength"])
+plt.xticks([i for i in range(len(labels))], ["scarcity", "nonuniform\nprogress", "performance\nconstraints", 
+                                    "user\nheterogeneity", "cognitive", "external", "internal", "coordination", "technical", "demand"])
 
 plt.show()
 
