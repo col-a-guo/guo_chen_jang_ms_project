@@ -41,7 +41,7 @@ for year in range(2007, 2024):
                             # Parse string to a list
                             parsed_list = ast.literal_eval(stage_value)
                             if isinstance(parsed_list, list):
-                                return float(sum(parsed_list) // len(parsed_list))
+                                return float(sum(parsed_list) / len(parsed_list))
                         except:
                             pass
                     # If it's already a float or int, return it

@@ -17,55 +17,20 @@ from imblearn.over_sampling import RandomOverSampler
 from imblearn.under_sampling import RandomUnderSampler
 import matplotlib.pyplot as plt
 import numpy as np
+from sklearn.feature_selection import RFE
 
-# Read the data
 data = pd.read_csv("train_combined.csv")
 data.label = data.label.apply(pd.to_numeric, errors='coerce')
 data = data.dropna()
 
-
-
-# Calculate sampling_strategy based on label counts
 label_counts = data.label.value_counts()
 sampling_strategy = {label: int(count * 0.15) for label, count in label_counts.items()}
 
 scaler = MinMaxScaler()
 
 y = data.loc[:, "label"].astype(int)
-
 y.fillna(0)
 
-# Initial labels
-labels = [
-    "scarcity", 
-    "nonuniform_progress", 
-    "performance_constraints",  
-    "user_heterogeneity", 
-    "cognitive", 
-    "external", 
-    "internal", 
-    "coordination", 
-    "technical", 
-    "demand",
-    "paragraph"
-]
-
-X = data[labels]
-
-# Adding "number_of_types" as the sum of rows
-X['number_of_types'] = X.sum(axis=1)
-
-# Add new columns: word_count and character_count
-X['word_count'] = X['paragraph'].apply(lambda x: len(str(x).split()))
-X['character_count'] = X['paragraph'].apply(lambda x: len(str(x)))
-
-# Update labels
-labels.append("word_count")
-labels.append("character_count")
-labels.append("number_of_types")
-
-
-# Define labels to keep
 labels = [
     "scarcity", 
     "nonuniform_progress", 
@@ -77,19 +42,18 @@ labels = [
     "coordination", 
     "technical", 
     "demand", 
-    "number_of_types"
+    "number_of_types",
+    "word_count",
+    "char_count"
 ]
 
-# Keep only the labels defined above
-X = X[labels]
-
-# Scale the data
+X = data[labels]
 X = pd.DataFrame(scaler.fit_transform(X), columns=X.columns)
 
-# Initialize importance array
-importance_array = [[] for i in range(len(labels))]
+rfe_importance_array = [[] for i in range(len(labels))]
+perm_importance_array = [[] for i in range(len(labels))]
+coeff_importance_array = [[] for i in range(len(labels))]
 
-# Begin averaging loop
 acc_array = []
 loop_count = 10
 for randomloop in range(loop_count):
@@ -97,38 +61,37 @@ for randomloop in range(loop_count):
     ros = RandomOverSampler(random_state=randomloop)
     X, y = ros.fit_resample(X, y)
 
-    # Splitting arrays or matrices into random train and test subsets
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.30)
 
-    # Stacking classifier with RandomForest and Logistic Regression
     estimators = [
         ('rf', RandomForestClassifier(n_estimators=10, random_state=randomloop)),
-        ('mnlr', make_pipeline(PolynomialFeatures(degree=2),
-                            MinMaxScaler(),
-                            LogisticRegression(random_state=1)))
     ]
 
     clf = StackingClassifier(
-        estimators=estimators, final_estimator=linear_model.LogisticRegression(penalty='l2')
+        estimators=estimators, final_estimator=make_pipeline(PolynomialFeatures(degree=2),
+                                                              MinMaxScaler(),
+                                                              LogisticRegression(penalty='l2', solver="saga"))
     )
 
     clf.fit(X_train, y_train)
 
-    # Calculate permutation importance
     result = permutation_importance(clf, X, y, n_repeats=8, random_state=1)
-
-    # Access the importance scores
     importances = result.importances_mean
-
-    # Add importances to the array
     for i, feature in enumerate(labels):
-        importance_array[i].append(importances[i])
+        perm_importance_array[i].append(importances[i])
 
-    # Undersample the test set
+    rfe_selector = RFE(estimator=LogisticRegression(penalty='l2', solver='saga'), n_features_to_select=1)
+    rfe_selector = rfe_selector.fit(X_train, y_train)
+    rfe_importances = rfe_selector.ranking_
+    for i, feature in enumerate(labels):
+        rfe_importance_array[i].append(rfe_importances[i])
+
+    log_reg = LogisticRegression(penalty='l2', solver='saga').fit(X_train, y_train)
+    coeff_importance_array.append(log_reg.coef_[0])
+
     rus = RandomUnderSampler(sampling_strategy=sampling_strategy)
     X_test, y_test = rus.fit_resample(X_test, y_test)
 
-    # Perform predictions on the test dataset
     y_pred = clf.predict(X_test)
 
     acc_array.append(metrics.accuracy_score(y_test, y_pred))
@@ -140,21 +103,42 @@ print(metrics.classification_report(y_test, y_pred))
 mean_acc = np.mean(acc_array)
 stdev_acc = np.std(acc_array)
 
-x = [i for i in range(len(labels))]
-y_std = [np.std(implist) for implist in importance_array]
-y = [np.mean(implist) for implist in importance_array]
+mean_rfe = [np.mean(rfe_importance_array[i]) for i in range(len(labels))]
+std_rfe = [np.std(rfe_importance_array[i]) for i in range(len(labels))]
 
-# Format the labels for display
+mean_perm = [np.mean(perm_importance_array[i]) for i in range(len(labels))]
+std_perm = [np.std(perm_importance_array[i]) for i in range(len(labels))]
+
+mean_coeff = [np.mean(coeff_importance_array[i]) for i in range(len(labels))]
+std_coeff = [np.std(coeff_importance_array[i]) for i in range(len(labels))]
+
+scaler = MinMaxScaler()
+mean_rfe_scaled = scaler.fit_transform(np.array(mean_rfe).reshape(-1, 1)).flatten()
+std_rfe_scaled = scaler.fit_transform(np.array(std_rfe).reshape(-1, 1)).flatten()
+
+mean_perm_scaled = scaler.fit_transform(np.array(mean_perm).reshape(-1, 1)).flatten()
+std_perm_scaled = scaler.fit_transform(np.array(std_perm).reshape(-1, 1)).flatten()
+
+mean_coeff_scaled = scaler.fit_transform(np.array(mean_coeff).reshape(-1, 1)).flatten()
+std_coeff_scaled = scaler.fit_transform(np.array(std_coeff).reshape(-1, 1)).flatten()
+
 formatted_labels = [label.replace('_', '\n').replace(' ', '\n') for label in labels]
 
-# Plot the results
 plt.figure(figsize=(20, 8))
-plt.bar(x, y)
-plt.suptitle("Feature Importances for Random Forest -> Quadratic -> Logistic Regression")
+
+x = np.arange(len(labels))
+
+plt.bar(x - 0.2, mean_rfe_scaled, yerr=std_rfe_scaled, width=0.2, label='RFE', color='b', capsize=5)
+plt.bar(x, mean_perm_scaled, yerr=std_perm_scaled, width=0.2, label='Permutation Importance', color='g', capsize=5)
+plt.bar(x + 0.2, mean_coeff_scaled, yerr=std_coeff_scaled, width=0.2, label='Logistic Coefficients', color='r', capsize=5)
+
+plt.suptitle("Feature Importances: RFE, Permutation, and Logistic Regression Coefficients")
 plt.title(f"Note: Accuracy averaged {str(mean_acc)[:4]} with stdev {str(stdev_acc)[:4]}")
 plt.xlabel("Feature")
 plt.ylabel("Importance")
-plt.errorbar(x, y, y_std, fmt='.', color='Black', elinewidth=2, capthick=10, errorevery=1, alpha=0.5, ms=4, capsize=2)
-plt.xticks([i for i in range(len(labels))], formatted_labels)
+
+plt.xticks(x, formatted_labels)
+
+plt.legend()
 
 plt.show()
