@@ -3,7 +3,7 @@ from scipy.stats.mstats import winsorize
 from sklearn.model_selection import train_test_split
 
 # Step 1: Load the datasets and concatenate
-ogpath1 = "multichannel.csv"
+ogpath1 = "new_multichannel.csv"
 ogpath2 = "streaming.csv"
 df1 = pd.read_csv(ogpath1)
 df2 = pd.read_csv(ogpath2)
