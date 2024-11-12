@@ -7,7 +7,7 @@ from sklearn import datasets
 from sklearn.linear_model import LogisticRegression
 from sklearn.inspection import permutation_importance
 from sklearn.svm import LinearSVC
-from sklearn.preprocessing import MinMaxScaler, StandardScaler
+from sklearn.preprocessing import MinMaxScaler, QuantileTransformer, RobustScaler, normalize
 from sklearn.pipeline import make_pipeline
 from sklearn.ensemble import StackingRegressor
 from sklearn.ensemble import StackingClassifier
@@ -19,12 +19,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.feature_selection import RFE
 
+
+# Load and preprocess the data
 data = pd.read_csv("train_combined.csv")
 data.label = data.label.apply(pd.to_numeric, errors='coerce')
 data = data.dropna()
 
 label_counts = data.label.value_counts()
-sampling_strategy = {label: int(count * 0.15) for label, count in label_counts.items()}
+sampling_strategy = {label: int(count * 0.25) for label, count in label_counts.items()}
 
 scaler = MinMaxScaler()
 
@@ -50,18 +52,19 @@ labels = [
 X = data[labels]
 X = pd.DataFrame(scaler.fit_transform(X), columns=X.columns)
 
+# Arrays to store feature importance
 rfe_importance_array = [[] for i in range(len(labels))]
 perm_importance_array = [[] for i in range(len(labels))]
 coeff_importance_array = [[] for i in range(len(labels))]
 
 acc_array = []
-loop_count = 10
+loop_count = 2
 for randomloop in range(loop_count):
     
     ros = RandomOverSampler(random_state=randomloop)
-    X, y = ros.fit_resample(X, y)
+    X_resampled, y_resampled = ros.fit_resample(X, y)
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.30)
+    X_train, X_test, y_train, y_test = train_test_split(X_resampled, y_resampled, test_size=0.30)
 
     estimators = [
         ('rf', RandomForestClassifier(n_estimators=10, random_state=randomloop)),
@@ -75,70 +78,99 @@ for randomloop in range(loop_count):
 
     clf.fit(X_train, y_train)
 
-    result = permutation_importance(clf, X, y, n_repeats=8, random_state=1)
+    # Permutation importance
+    result = permutation_importance(clf, X_train, y_train, n_repeats=8, random_state=randomloop)
     importances = result.importances_mean
     for i, feature in enumerate(labels):
         perm_importance_array[i].append(importances[i])
 
-    rfe_selector = RFE(estimator=LogisticRegression(penalty='l2', solver='saga'), n_features_to_select=1)
+    # RFE
+    rfe_selector = RFE(estimator=LogisticRegression(penalty='l2', solver='saga'), n_features_to_select=4)
     rfe_selector = rfe_selector.fit(X_train, y_train)
     rfe_importances = rfe_selector.ranking_
     for i, feature in enumerate(labels):
         rfe_importance_array[i].append(rfe_importances[i])
 
+    # Logistic Regression coefficients
     log_reg = LogisticRegression(penalty='l2', solver='saga').fit(X_train, y_train)
-    coeff_importance_array.append(log_reg.coef_[0])
+    for i in range(len(labels)):
+        coeff_importance_array[i].append(abs(log_reg.coef_[0][i]))  # Store each coefficient value
 
+    # Under-sampling test set
     rus = RandomUnderSampler(sampling_strategy=sampling_strategy)
     X_test, y_test = rus.fit_resample(X_test, y_test)
 
+    # Evaluate the model
     y_pred = clf.predict(X_test)
 
     acc_array.append(metrics.accuracy_score(y_test, y_pred))
     if randomloop % 10 == 0: 
-        print("loop "+str(randomloop)+" done")
+        print("Loop " + str(randomloop) + " done")
 
 print(metrics.classification_report(y_test, y_pred))
+# Scale the feature importances before calculating mean and standard deviation
+scaler = RobustScaler()
+def normalize_with_std(mean_array, std_array):
+    # Calculate the L2 norm of the mean array (sum of squares = 1)
+    norm_factor = np.linalg.norm(mean_array)
+    
+    # Normalize both the mean and std arrays with the same factor
+    normalized_mean = mean_array / norm_factor
+    normalized_std = std_array / norm_factor
+    
+    return normalized_mean, normalized_std
 
-mean_acc = np.mean(acc_array)
-stdev_acc = np.std(acc_array)
+# Invert RFE rankings so that higher numbers indicate higher importance
+inverted_rfe_importance = max(np.array(rfe_importance_array).flatten()) + 1 - np.array(rfe_importance_array).flatten()
 
-mean_rfe = [np.mean(rfe_importance_array[i]) for i in range(len(labels))]
-std_rfe = [np.std(rfe_importance_array[i]) for i in range(len(labels))]
+# Reshape back to original structure if needed
+inverted_rfe_importance = inverted_rfe_importance.reshape(len(rfe_importance_array), -1)
 
-mean_perm = [np.mean(perm_importance_array[i]) for i in range(len(labels))]
-std_perm = [np.std(perm_importance_array[i]) for i in range(len(labels))]
+# Calculate means without scaling
+mean_rfe = np.array([np.mean(inverted_rfe_importance[i]) for i in range(len(labels))])
+mean_perm = np.array([np.mean(perm_importance_array[i]) for i in range(len(labels))])
+mean_coeff = np.array([np.mean(coeff_importance_array[i]) for i in range(len(labels))])
 
-mean_coeff = [np.mean(coeff_importance_array[i]) for i in range(len(labels))]
-std_coeff = [np.std(coeff_importance_array[i]) for i in range(len(labels))]
+# Calculate standard deviations without scaling
+std_rfe = np.array([np.std(inverted_rfe_importance[i]) for i in range(len(labels))])
+std_perm = np.array([np.std(perm_importance_array[i]) for i in range(len(labels))])
+std_coeff = np.array([np.std(coeff_importance_array[i]) for i in range(len(labels))])
 
-scaler = MinMaxScaler()
-mean_rfe_scaled = scaler.fit_transform(np.array(mean_rfe).reshape(-1, 1)).flatten()
-std_rfe_scaled = scaler.fit_transform(np.array(std_rfe).reshape(-1, 1)).flatten()
+# Apply the custom normalization function to each set
+normalized_mean_rfe, normalized_std_rfe = normalize_with_std(mean_rfe, std_rfe)
+normalized_mean_perm, normalized_std_perm = normalize_with_std(mean_perm, std_perm)
+normalized_mean_coeff, normalized_std_coeff = normalize_with_std(mean_coeff, std_coeff)
 
-mean_perm_scaled = scaler.fit_transform(np.array(mean_perm).reshape(-1, 1)).flatten()
-std_perm_scaled = scaler.fit_transform(np.array(std_perm).reshape(-1, 1)).flatten()
 
-mean_coeff_scaled = scaler.fit_transform(np.array(mean_coeff).reshape(-1, 1)).flatten()
-std_coeff_scaled = scaler.fit_transform(np.array(std_coeff).reshape(-1, 1)).flatten()
 
-formatted_labels = [label.replace('_', '\n').replace(' ', '\n') for label in labels]
+# Calculate the average of normalized means across RFE, Permutation, and Coefficients
+mean_avg = (normalized_mean_rfe + normalized_mean_perm + normalized_mean_coeff) / 3
 
+# Plotting
 plt.figure(figsize=(20, 8))
-
 x = np.arange(len(labels))
 
-plt.bar(x - 0.2, mean_rfe_scaled, yerr=std_rfe_scaled, width=0.2, label='RFE', color='b', capsize=5)
-plt.bar(x, mean_perm_scaled, yerr=std_perm_scaled, width=0.2, label='Permutation Importance', color='g', capsize=5)
-plt.bar(x + 0.2, mean_coeff_scaled, yerr=std_coeff_scaled, width=0.2, label='Logistic Coefficients', color='r', capsize=5)
+# Define blue color palette
+colors = {
+    "RFE": "#4682B4",        # Steel Blue
+    "Permutation": "#5F9EA0", # Cadet Blue
+    "Coefficient": "#87CEEB", # Sky Blue
+    "Average": "#8630db"     # Purple for distinctness
+}
 
-plt.suptitle("Feature Importances: RFE, Permutation, and Logistic Regression Coefficients")
-plt.title(f"Note: Accuracy averaged {str(mean_acc)[:4]} with stdev {str(stdev_acc)[:4]}")
-plt.xlabel("Feature")
-plt.ylabel("Importance")
+# Plot the average behind everything, wider and semi-transparent
+plt.bar(x, mean_avg, width=0.7, label='Average of Means', color=colors["Average"], alpha=0.3, zorder=1)
 
-plt.xticks(x, formatted_labels)
+# Plot RFE, Permutation, and Coefficients importance with error bars in front
+plt.bar(x - 0.2, normalized_mean_rfe, yerr=normalized_std_rfe, width=0.2, label='RFE', color=colors["RFE"], capsize=5, zorder=0)
+plt.bar(x, normalized_mean_perm, yerr=normalized_std_perm, width=0.2, label='Permutation Importance', color=colors["Permutation"], capsize=5, zorder=0)
+plt.bar(x + 0.2, normalized_mean_coeff, yerr=normalized_std_coeff, width=0.2, label='Logistic Coefficients', color=colors["Coefficient"], capsize=5, zorder=0)
 
+# Formatting
+plt.xticks(x, [label.replace('_', '\n').replace(' ', '\n') for label in labels], rotation=45, ha="right")
+plt.xlabel("Features")
+plt.ylabel("Normalized Importance")
+plt.title("Comparison of Feature Importances with Normalized Means")
 plt.legend()
-
+plt.tight_layout()
 plt.show()

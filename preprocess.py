@@ -41,7 +41,9 @@ type_columns = [
 ]
 data["number_of_types"] = data[type_columns].sum(axis=1) / 10
 
-train_df, test_df = train_test_split(data, test_size=0.2, random_state=1, stratify=data['label'])
+data.to_csv("combined.csv", index=False)
 
-train_df.to_csv("train_combined.csv", index=False)
-test_df.to_csv("test_combined.csv", index=False)
+# train_df, test_df = train_test_split(data, test_size=0.2, random_state=1, stratify=data['label'])
+
+# train_df.to_csv("train_combined.csv", index=False)
+# test_df.to_csv("test_combined.csv", index=False)
