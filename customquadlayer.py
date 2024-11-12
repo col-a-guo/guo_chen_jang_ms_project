@@ -63,26 +63,13 @@ coeff_importance_array = [[] for i in range(len(labels))]
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import classification_report
 
-from sklearn.ensemble import StackingClassifier, RandomForestClassifier
-from sklearn.linear_model import LogisticRegression
-from xgboost import XGBClassifier
-from sklearn.pipeline import make_pipeline
-from sklearn.preprocessing import PolynomialFeatures, MinMaxScaler
-from sklearn.metrics import accuracy_score
-from sklearn.model_selection import train_test_split
-from imblearn.over_sampling import RandomOverSampler
-from imblearn.under_sampling import RandomUnderSampler
-import numpy as np
-
 # Accuracy arrays for each model
-acc_array_stack_rf_l2 = []        # Stacking model with RF and L2 Logistic Regression
-acc_array_stack_xgb_l2 = []       # Stacking model with XGBoost and L2 Logistic Regression
-acc_array_xgb_rf = []             # XGBoost RandomForest
-acc_array_log_reg_l2 = []         # L2 Logistic Regression
-acc_array_rf = []                 # Normal sklearn RandomForest
-acc_array_stack_rf_l1 = []        # Stacking model with RF and L1 Logistic Regression
+acc_array = []
+acc_array_xgb = []
+acc_array_l1 = []  # Array for the L1-regularized model
+acc_array_l1_stack = []  # Array for the stacking model with L1 regularization
 
-loop_count = 2
+loop_count = 20
 for randomloop in range(loop_count):
     # Resampling
     ros = RandomOverSampler(random_state=randomloop)
@@ -90,100 +77,86 @@ for randomloop in range(loop_count):
     
     X_train, X_test, y_train, y_test = train_test_split(X_resampled, y_resampled, test_size=0.30)
     
-    # Define estimators for stacking models
-    rf_estimator = RandomForestClassifier(n_estimators=10, random_state=randomloop)
-    xgb_estimator = XGBClassifier(n_estimators=10, use_label_encoder=False, eval_metric='mlogloss', random_state=randomloop)
-    
-    # Stacking model with RF and L2-regularized Logistic Regression as final estimator
-    clf_stack_rf_l2 = StackingClassifier(
-        estimators=[('rf', rf_estimator)],
+    # Define estimators for stacking model
+    estimators = [
+        ('rf', RandomForestClassifier(n_estimators=10, random_state=randomloop)),
+    ]
+
+    # Stacking classifier with L2-regularized Logistic Regression as final estimator
+    clf = StackingClassifier(
+        estimators=estimators,
         final_estimator=make_pipeline(PolynomialFeatures(degree=2),
                                       MinMaxScaler(),
                                       LogisticRegression(penalty='l2', solver="saga"))
     )
-    clf_stack_rf_l2.fit(X_train, y_train)
-    
-    # Stacking model with XGB and L2-regularized Logistic Regression as final estimator
-    clf_stack_xgb_l2 = StackingClassifier(
-        estimators=[('xgb', xgb_estimator)],
-        final_estimator=make_pipeline(PolynomialFeatures(degree=2),
-                                      MinMaxScaler(),
-                                      LogisticRegression(penalty='l2', solver="saga"))
-    )
-    clf_stack_xgb_l2.fit(X_train, y_train)
+    clf.fit(X_train, y_train)
 
-    # XGBoost RandomForest model
-    xgb_rf = XGBClassifier(n_estimators=10, use_label_encoder=False, eval_metric='mlogloss', random_state=randomloop)
-    xgb_rf.fit(X_train, y_train)
-    
-    # L2-regularized Logistic Regression model
-    log_reg_l2 = LogisticRegression(penalty='l2', solver='saga', random_state=randomloop)
-    log_reg_l2.fit(X_train, y_train)
-
-    # Normal sklearn RandomForest model
-    rf = RandomForestClassifier(n_estimators=10, random_state=randomloop)
-    rf.fit(X_train, y_train)
-
-    # Stacking model with RF and L1-regularized Logistic Regression as final estimator
-    clf_stack_rf_l1 = StackingClassifier(
-        estimators=[('rf', rf_estimator)],
+    # Stacking classifier with L1-regularized Logistic Regression as final estimator
+    clf_l1 = StackingClassifier(
+        estimators=estimators,
         final_estimator=make_pipeline(PolynomialFeatures(degree=2),
                                       MinMaxScaler(),
                                       LogisticRegression(penalty='l1', solver="saga"))
     )
-    clf_stack_rf_l1.fit(X_train, y_train)
+    clf_l1.fit(X_train, y_train)
+
+    # New XGBoost RandomForest model
+    xgb_rf = XGBClassifier(n_estimators=10, use_label_encoder=False, eval_metric='mlogloss', random_state=randomloop)
+    xgb_rf.fit(X_train, y_train)
+    
+    # L1-regularized Logistic Regression model
+    l1_log_reg = LogisticRegression(penalty='l1', solver='saga', random_state=randomloop)
+    l1_log_reg.fit(X_train, y_train)
+
+    # Permutation importance calculation for the stacking model
+    result = permutation_importance(clf, X_train, y_train, n_repeats=8, random_state=randomloop)
+    importances = result.importances_mean
+    for i, feature in enumerate(labels):
+        perm_importance_array[i].append(importances[i])
+
+    # RFE selection
+    rfe_selector = RFE(estimator=LogisticRegression(penalty='l2', solver='saga'), n_features_to_select=4)
+    rfe_selector = rfe_selector.fit(X_train, y_train)
+    rfe_importances = rfe_selector.ranking_
+    for i, feature in enumerate(labels):
+        rfe_importance_array[i].append(rfe_importances[i])
+
+    # Coefficients for L2 logistic regression
+    log_reg = LogisticRegression(penalty='l2', solver='saga').fit(X_train, y_train)
+    for i in range(len(labels)):
+        coeff_importance_array[i].append(abs(log_reg.coef_[0][i]))
 
     # Returning test set to original label ratios
     rus = RandomUnderSampler(sampling_strategy=sampling_strategy)
     X_test, y_test = rus.fit_resample(X_test, y_test)
 
-    # Predict and record accuracies for all models
-    y_pred_stack_rf_l2 = clf_stack_rf_l2.predict(X_test)
-    y_pred_stack_xgb_l2 = clf_stack_xgb_l2.predict(X_test)
+    # Predict with all models
+    y_pred = clf.predict(X_test)
     y_pred_xgb_rf = xgb_rf.predict(X_test)
-    y_pred_log_reg_l2 = log_reg_l2.predict(X_test)
-    y_pred_rf = rf.predict(X_test)
-    y_pred_stack_rf_l1 = clf_stack_rf_l1.predict(X_test)
+    y_pred_l1 = l1_log_reg.predict(X_test)
+    y_pred_l1_stack = clf_l1.predict(X_test)
 
-    # Append accuracies to respective arrays
-    acc_array_stack_rf_l2.append(accuracy_score(y_test, y_pred_stack_rf_l2))
-    acc_array_stack_xgb_l2.append(accuracy_score(y_test, y_pred_stack_xgb_l2))
-    acc_array_xgb_rf.append(accuracy_score(y_test, y_pred_xgb_rf))
-    acc_array_log_reg_l2.append(accuracy_score(y_test, y_pred_log_reg_l2))
-    acc_array_rf.append(accuracy_score(y_test, y_pred_rf))
-    acc_array_stack_rf_l1.append(accuracy_score(y_test, y_pred_stack_rf_l1))
+    # Record accuracies
+    acc_array.append(metrics.accuracy_score(y_test, y_pred))
+    acc_array_xgb.append(metrics.accuracy_score(y_test, y_pred_xgb_rf))
+    acc_array_l1.append(metrics.accuracy_score(y_test, y_pred_l1))
+    acc_array_l1_stack.append(metrics.accuracy_score(y_test, y_pred_l1_stack))
 
     if randomloop % 10 == 0:
         print(f"Loop {randomloop} done")
 
-#################### PRINT REPORTS AND ACCURACIES ####################
-
-print("\nClassification Report for Stacking Model with L2:")
-print(classification_report(y_test, y_pred_stack_rf_l2))
-
-print("\nClassification Report for Stacking Model with XGBoost and L2:")
-print(classification_report(y_test, y_pred_stack_xgb_l2))
+#################### PRINT REPORTS ####################
+print("\nClassification Report for Stacking Model with L2 Regularization:")
+print(classification_report(y_test, y_pred))
 
 print("\nClassification Report for XGBoost RandomForest:")
 print(classification_report(y_test, y_pred_xgb_rf))
 
-print("\nClassification Report for L2 Logistic Regression:")
-print(classification_report(y_test, y_pred_log_reg_l2))
-
-print("\nClassification Report for Random Forest only:")
-print(classification_report(y_test, y_pred_rf))
+print("\nClassification Report for L1 Logistic Regression:")
+print(classification_report(y_test, y_pred_l1))
 
 print("\nClassification Report for Stacking Model with L1 Regularization:")
-print(classification_report(y_test, y_pred_stack_rf_l1))
-
-
-print("\nAverage Accuracies for Each Model (across loops):")
-print(f"Stacking Model with RF and L2 Logistic Regression: {np.mean(acc_array_stack_rf_l2):.4f}")
-print(f"Stacking Model with XGB and L2 Logistic Regression: {np.mean(acc_array_stack_xgb_l2):.4f}")
-print(f"XGBoost RandomForest: {np.mean(acc_array_xgb_rf):.4f}")
-print(f"L2 Logistic Regression: {np.mean(acc_array_log_reg_l2):.4f}")
-print(f"Normal sklearn RandomForest: {np.mean(acc_array_rf):.4f}")
-print(f"Stacking Model with RF and L1 Logistic Regression: {np.mean(acc_array_stack_rf_l1):.4f}")
+print(classification_report(y_test, y_pred_l1_stack))
 
 
 
