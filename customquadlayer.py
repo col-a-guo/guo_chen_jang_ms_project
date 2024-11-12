@@ -21,7 +21,7 @@ from sklearn.feature_selection import RFE
 
 
 # Load and preprocess the data
-data = pd.read_csv("train_combined.csv")
+data = pd.read_csv("combined.csv")
 data.label = data.label.apply(pd.to_numeric, errors='coerce')
 data = data.dropna()
 
