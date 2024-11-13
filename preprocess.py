@@ -1,11 +1,11 @@
 import pandas as pd
 from scipy.stats.mstats import winsorize
 from sklearn.model_selection import train_test_split
+import numpy as np
 
 ogpath1 = "new_multichannel.csv"
 ogpath2 = "streaming.csv"
 ogpath3 = "multichannel.csv"
-
 # Load and assign source values
 df1 = pd.read_csv(ogpath1)
 df1['source'] = 0  # Set source to 0 for ogpath1
@@ -19,6 +19,31 @@ df3['source'] = 0  # Set source to 0 for ogpath3
 # Concatenate dataframes
 data = pd.concat([df1, df2, df3], ignore_index=True)
 
+# Function to check if a string can be converted to a float, else convert to NaN
+def convert_invalid_int_strings_to_nan(val):
+    if isinstance(val, str):
+        try:
+            # Try converting the string to a float
+            float(val)
+            return val  # Keep the valid string
+        except ValueError:
+            # If conversion fails, return NaN
+            print("failed to convert"+val)
+            return np.NaN
+    return val  # If not a string, leave it as is
+
+
+# Apply the function to the entire DataFrame, excluding the 'paragraph' column
+data_excluding_paragraph = data.drop(columns=["paragraph", "version","2500Bott", "year", "path", "date"]).applymap(convert_invalid_int_strings_to_nan)
+
+# Re-add the 'paragraph' column back to the dataframe
+data_excluding_paragraph["paragraph"] = data["paragraph"]
+
+data = data_excluding_paragraph
+
+
+
+
 # Data cleaning and preprocessing
 data = data.dropna(subset=['stage'])
 data.rename(columns={'stage': 'label'}, inplace=True)
@@ -27,11 +52,12 @@ data['label'] = data['label'].replace(1.5, 1)
 data['label'] = data['label'].map(lambda x: f"{x:.1f}") 
 
 columns_to_keep = [
-    "label", "scarcity", "nonuniform_progress", "performance_constraints", 
-    "user_heterogeneity", "cognitive", "external", "internal", "transactional",
+    "label","transactional", "scarcity", "nonuniform_progress", "performance_constraints", 
+    "user_heterogeneity", "cognitive", "external", "internal", 
     "coordination", "technical", "demand", "paragraph", "source"
 ]
 data = data[columns_to_keep]
+
 
 # "word_count" - Counts words by spaces in "paragraph" and winsorizes outliers
 data["word_count"] = data["paragraph"].str.count(" ") + 1

@@ -55,7 +55,7 @@ labels = [
     "source"
 ]
 
-def add_jitter(X, scale=0.05):
+def add_jitter(X, scale=0.01):
     jittered_X = X + np.random.normal(0, scale, X.shape)
     return np.clip(jittered_X, 0, 1)
 
