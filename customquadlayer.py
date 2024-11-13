@@ -25,11 +25,13 @@ from sklearn.metrics import classification_report
 
 # Load and preprocess the data
 data = pd.read_csv("combined.csv")
-data.label = data.label.apply(pd.to_numeric, errors='coerce')
-data = data.dropna()
+data.label = data.label.apply(pd.to_numeric)
+data = data.fillna(0)
 
 label_counts = data.label.value_counts()
 sampling_strategy = {label: int(count * 0.25) for label, count in label_counts.items()}
+print(label_counts)
+print(sampling_strategy)
 
 scaler = MinMaxScaler()
 
@@ -47,15 +49,20 @@ labels = [
     "coordination", 
     "technical", 
     "demand", 
+    "transactional",
     "number_of_types",
     "word_count",
-    "char_count"
+    "source"
 ]
+
+def add_jitter(X, scale=0.05):
+    jittered_X = X + np.random.normal(0, scale, X.shape)
+    return np.clip(jittered_X, 0, 1)
+
 
 X = data[labels]
 X = pd.DataFrame(scaler.fit_transform(X), columns=X.columns)
 
-# Arrays to store feature importance
 rfe_importance_array = [[] for i in range(len(labels))]
 perm_importance_array = [[] for i in range(len(labels))]
 coeff_importance_array = [[] for i in range(len(labels))]
@@ -63,13 +70,14 @@ coeff_importance_array = [[] for i in range(len(labels))]
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import classification_report
 
-# Accuracy arrays for each model
 acc_array = []
 acc_array_xgb = []
 acc_array_l1 = []  # Array for the L1-regularized model
 acc_array_l1_stack = []  # Array for the stacking model with L1 regularization
 
-loop_count = 20
+
+
+loop_count = 1
 for randomloop in range(loop_count):
     # Resampling
     ros = RandomOverSampler(random_state=randomloop)
@@ -77,6 +85,10 @@ for randomloop in range(loop_count):
     
     X_train, X_test, y_train, y_test = train_test_split(X_resampled, y_resampled, test_size=0.30)
     
+
+    X_train[["internal", "coordination", "technical"]] #= add_jitter(X_train[["internal", "coordination", "technical"]], scale=0.02)
+    
+
     # Define estimators for stacking model
     estimators = [
         ('rf', RandomForestClassifier(n_estimators=10, random_state=randomloop)),
@@ -87,7 +99,7 @@ for randomloop in range(loop_count):
         estimators=estimators,
         final_estimator=make_pipeline(PolynomialFeatures(degree=2),
                                       MinMaxScaler(),
-                                      LogisticRegression(penalty='l2', solver="saga"))
+                                      LogisticRegression(penalty='l2', solver="saga", max_iter=10000))
     )
     clf.fit(X_train, y_train)
 
@@ -96,16 +108,16 @@ for randomloop in range(loop_count):
         estimators=estimators,
         final_estimator=make_pipeline(PolynomialFeatures(degree=2),
                                       MinMaxScaler(),
-                                      LogisticRegression(penalty='l1', solver="saga"))
+                                      LogisticRegression(penalty='l1', solver="saga", max_iter=10000))
     )
     clf_l1.fit(X_train, y_train)
 
     # New XGBoost RandomForest model
-    xgb_rf = XGBClassifier(n_estimators=10, use_label_encoder=False, eval_metric='mlogloss', random_state=randomloop)
+    xgb_rf = XGBClassifier(n_estimators=10, eval_metric='mlogloss', random_state=randomloop)
     xgb_rf.fit(X_train, y_train)
     
     # L1-regularized Logistic Regression model
-    l1_log_reg = LogisticRegression(penalty='l1', solver='saga', random_state=randomloop)
+    l1_log_reg = LogisticRegression(penalty='l1', solver='saga', random_state=randomloop,max_iter=10000)
     l1_log_reg.fit(X_train, y_train)
 
     # Permutation importance calculation for the stacking model
@@ -115,7 +127,7 @@ for randomloop in range(loop_count):
         perm_importance_array[i].append(importances[i])
 
     # RFE selection
-    rfe_selector = RFE(estimator=LogisticRegression(penalty='l2', solver='saga'), n_features_to_select=4)
+    rfe_selector = RFE(estimator=LogisticRegression(penalty='l2', solver='saga', max_iter=10000), n_features_to_select=4)
     rfe_selector = rfe_selector.fit(X_train, y_train)
     rfe_importances = rfe_selector.ranking_
     for i, feature in enumerate(labels):
