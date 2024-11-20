@@ -21,7 +21,7 @@ else:
 tokenizer = AutoTokenizer.from_pretrained("pborchert/BusinessBERT")
 
 # Load and preprocess the dataset
-ogpath = "combined.csv"
+ogpath = "multichannel.csv"
 dataset = load_dataset('csv', data_files={'train': "train_" + ogpath, 'test': "test_" + ogpath})
 
 def tokenize_function(examples):
@@ -111,7 +111,7 @@ class BertClassifier(nn.Module):
         return binary_logits, multilabel_logits
 
 # Update the loss function to handle both tasks
-MSE_loss_fn = nn.MSELoss()  # MSE loss for regression task
+binary_loss_fn = nn.MSELoss()  # Binary cross-entropy loss for the binary classification task
 multilabel_loss_fn = nn.BCEWithLogitsLoss()  # Binary cross-entropy loss for multilabel tasks
 
 # Update the training loop to handle the dual task
@@ -124,7 +124,7 @@ def train(model, train_dataloader, val_dataloader, epochs=4):
 
         model.train()
         t0_epoch = time.time()
-        total_MSE_loss, total_multilabel_loss = 0, 0
+        total_binary_loss, total_multilabel_loss = 0, 0
 
         for step, batch in enumerate(train_dataloader):
             # Load batch to device
@@ -137,9 +137,9 @@ def train(model, train_dataloader, val_dataloader, epochs=4):
             binary_logits, multilabel_logits = model(b_input_ids, b_attn_mask)
 
             # Compute losses
-            MSE_loss = MSE_loss_fn(binary_logits.squeeze(), b_binary_labels)
+            binary_loss = binary_loss_fn(binary_logits.squeeze(), b_binary_labels)
             multilabel_loss = multilabel_loss_fn(multilabel_logits, b_multilabel_labels)
-            loss = MSE_loss + multilabel_loss
+            loss = binary_loss + multilabel_loss
 
             # Backward pass and optimization
             loss.backward()
@@ -148,15 +148,15 @@ def train(model, train_dataloader, val_dataloader, epochs=4):
             scheduler.step()
 
             # Accumulate losses
-            total_MSE_loss += MSE_loss.item()
+            total_binary_loss += binary_loss.item()
             total_multilabel_loss += multilabel_loss.item()
 
         # Calculate average losses
-        avg_MSE_loss = total_MSE_loss / len(train_dataloader)
+        avg_binary_loss = total_binary_loss / len(train_dataloader)
         avg_multilabel_loss = total_multilabel_loss / len(train_dataloader)
         elapsed_time = time.time() - t0_epoch
 
-        print(f"{'Average':<8}{avg_MSE_loss:<20.6f}{avg_multilabel_loss:<25.6f}{elapsed_time:<9.2f}")
+        print(f"{'Average':<8}{avg_binary_loss:<20.6f}{avg_multilabel_loss:<25.6f}{elapsed_time:<9.2f}")
 
         # Evaluate on validation data
         if val_dataloader:
@@ -165,22 +165,22 @@ def train(model, train_dataloader, val_dataloader, epochs=4):
 # Update evaluation to handle the dual task
 def evaluate(model, val_dataloader):
     model.eval()
-    total_MSE_loss, total_multilabel_loss = 0, 0
+    total_binary_loss, total_multilabel_loss = 0, 0
     with torch.no_grad():
         for batch in val_dataloader:
             b_input_ids, b_attn_mask, b_binary_labels, b_multilabel_labels = tuple(t.to(device) for t in batch)
             binary_logits, multilabel_logits = model(b_input_ids, b_attn_mask)
 
             # Compute losses
-            MSE_loss = MSE_loss_fn(binary_logits.squeeze(), b_binary_labels)
+            binary_loss = binary_loss_fn(binary_logits.squeeze(), b_binary_labels)
             multilabel_loss = multilabel_loss_fn(multilabel_logits, b_multilabel_labels)
 
-            total_MSE_loss += MSE_loss.item()
+            total_binary_loss += binary_loss.item()
             total_multilabel_loss += multilabel_loss.item()
 
-    avg_MSE_loss = total_MSE_loss / len(val_dataloader)
+    avg_binary_loss = total_binary_loss / len(val_dataloader)
     avg_multilabel_loss = total_multilabel_loss / len(val_dataloader)
-    print(f"Validation Binary Loss: {avg_MSE_loss:.6f}")
+    print(f"Validation Binary Loss: {avg_binary_loss:.6f}")
     print(f"Validation Multilabel Loss: {avg_multilabel_loss:.6f}\n")
 
 # Initialize the updated model, optimizer, and scheduler
