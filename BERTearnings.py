@@ -21,7 +21,7 @@ small_train_dataset = tokenized_datasets["train"]
 small_eval_dataset = tokenized_datasets["test"]
 
 # Load the model for regression (num_labels 1 for regression)
-model = AutoModelForSequenceClassification.from_pretrained("pborchert/BusinessBERT", num_labels=3)
+model = AutoModelForSequenceClassification.from_pretrained("pborchert/BusinessBERT", num_labels=1)
 
 training_args = TrainingArguments(
     output_dir="test_trainer",
