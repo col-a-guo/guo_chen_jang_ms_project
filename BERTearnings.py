@@ -18,6 +18,14 @@ else:
     print('No GPU available, using the CPU instead.')
     device = torch.device("cpu")
 
+# Params
+num_epochs = 4
+learning_rate = 5e-5
+
+# Load model
+model = AutoModelForSequenceClassification.from_pretrained("pborchert/BusinessBERT", num_labels=1)
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+model.to(device)
 tokenizer = AutoTokenizer.from_pretrained("pborchert/BusinessBERT")
 
 # Load and preprocess the dataset
