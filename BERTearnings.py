@@ -1,47 +1,188 @@
-from transformers import AutoTokenizer, AutoModelForSequenceClassification, Trainer, TrainingArguments
+import torch
+import torch.nn as nn
+from transformers import AutoTokenizer, BertModel
+from torch.utils.data import DataLoader, Dataset
+from transformers import AdamW, get_scheduler, AutoModelForSequenceClassification
 from datasets import load_dataset
 import numpy as np
-import evaluate
-import torch
+import time
 
+# Params
+num_epochs = 4
+learning_rate = 5e-5
+
+# Load model
+model = AutoModelForSequenceClassification.from_pretrained("pborchert/BusinessBERT", num_labels=1)
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+model.to(device)
 tokenizer = AutoTokenizer.from_pretrained("pborchert/BusinessBERT")
 
-ogpath = "multichannel.csv"  
+# Load and preprocess the dataset
+ogpath = "combined.csv"
 dataset = load_dataset('csv', data_files={'train': "train_" + ogpath, 'test': "test_" + ogpath})
-
 
 def tokenize_function(examples):
     return tokenizer(examples["paragraph"], padding="max_length", truncation=True, max_length=512)
 
+tokenized_datasets = dataset.map(tokenize_function, batched=True)
+train_dataset = tokenized_datasets["train"]
+test_dataset = tokenized_datasets["test"]
+# Define a new dataset class for the binary and multilabel task
+class CustomDataset(Dataset):
+    def __init__(self, dataset, multilabel_columns):
+        self.dataset = dataset
+        self.multilabel_columns = multilabel_columns
 
-tokenized_datasets = dataset.map(tokenize_function, batched=True, batch_size=16)
+    def __len__(self):
+        return len(self.dataset)
 
+    def __getitem__(self, idx):
+        item = self.dataset[idx]
+        input_ids = torch.tensor(item['input_ids'])
+        attention_mask = torch.tensor(item['attention_mask'])
 
-small_train_dataset = tokenized_datasets["train"]
-small_eval_dataset = tokenized_datasets["test"]
+        # Binary classification label
+        label = torch.tensor(item['label'], dtype=torch.float)
 
-# Load the model for regression (num_labels 1 for regression)
-model = AutoModelForSequenceClassification.from_pretrained("pborchert/BusinessBERT", num_labels=1)
+        # Multilabel task labels
+        multilabels = torch.tensor([item[col] for col in self.multilabel_columns], dtype=torch.float)
 
-training_args = TrainingArguments(
-    output_dir="test_trainer",
-    evaluation_strategy="epoch",
-)
+        return input_ids, attention_mask, label, multilabels
 
-metric = evaluate.load("mse")
+# Specify multilabel columns
+multilabel_columns = [
+    "transactional", "scarcity", "nonuniform_progress", "performance_constraints",
+    "user_heterogeneity", "cognitive", "external", "internal",
+    "coordination", "technical", "demand"
+]
 
-# Function to compute metrics
-def compute_metrics(eval_pred):
-    logits, labels = eval_pred
-    predictions = logits.squeeze()  # For regression, squeeze to remove unnecessary dimensions
-    return metric.compute(predictions=predictions, references=labels)
+# Update the preprocessing and dataloader steps
+train_data = CustomDataset(train_dataset, multilabel_columns)
+test_data = CustomDataset(test_dataset, multilabel_columns)
 
-trainer = Trainer(
-    model=model,
-    args=training_args,
-    train_dataset=small_train_dataset,
-    eval_dataset=small_eval_dataset,
-    compute_metrics=compute_metrics,
-)
+train_dataloader = DataLoader(train_data, batch_size=16, shuffle=True)
+test_dataloader = DataLoader(test_data, batch_size=16)
 
-trainer.train()
+# Update the model to include a second head
+class BertClassifier(nn.Module):
+    """Bert Model for Binary and Multilabel Classification Tasks."""
+    def __init__(self, freeze_bert=False):
+        super(BertClassifier, self).__init__()
+        D_in, H = 768, 50
+
+        # Instantiate BERT model
+        self.bert = BertModel.from_pretrained('bert-base-uncased')
+
+        # Single-class regression head (output between 0 and 2)
+        self.regression_head = nn.Sequential(
+            nn.Linear(D_in, H),
+            nn.ReLU(),
+            nn.Linear(H, 1)  # Single scalar output
+        )
+
+        # Multilabel classification head
+        self.multilabel_classifier = nn.Sequential(
+            nn.Linear(D_in, H),
+            nn.ReLU(),
+            nn.Linear(H, len(multilabel_columns)),  # Number of multilabel tasks
+            nn.Sigmoid()  # Sigmoid activation for multilabel probabilities
+        )
+        # Freeze the BERT model if specified
+        if freeze_bert:
+            for param in self.bert.parameters():
+                param.requires_grad = False
+
+    def forward(self, input_ids, attention_mask):
+        # Feed input to BERT
+        outputs = self.bert(input_ids=input_ids, attention_mask=attention_mask)
+        last_hidden_state_cls = outputs[0][:, 0, :]  # [CLS] token embedding
+
+        # Binary classification logits
+        regression_logits = self.regression_head(last_hidden_state_cls)
+
+        # Multilabel classification logits
+        multilabel_logits = self.multilabel_classifier(last_hidden_state_cls)
+
+        return regression_logits, multilabel_logits
+
+# Update the loss function to handle both tasks
+regression_loss_fn = nn.MSELoss()  # MSE for stage prediction task
+multilabel_loss_fn = nn.BCEWithLogitsLoss() # Binary cross-entropy loss for multilabel tasks
+
+# Update the training loop to handle the dual task
+def train(model, train_dataloader, val_dataloader, epochs=4):
+    print("Starting training...\n")
+    for epoch in range(epochs):
+        print(f"Epoch {epoch+1}/{epochs}")
+        print(f"{'Batch':<8}{'Train Loss (Binary)':<20}{'Train Loss (Multilabel)':<25}{'Elapsed':<9}")
+        print("-" * 60)
+
+        model.train()
+        t0_epoch = time.time()
+        total_regression_loss, total_multilabel_loss = 0, 0
+
+        for step, batch in enumerate(train_dataloader):
+            # Load batch to device
+            b_input_ids, b_attn_mask, b_regression_labels, b_multilabel_labels = tuple(t.to(device) for t in batch)
+
+            # Zero out gradients
+            model.zero_grad()
+
+            # Forward pass
+            regression_logits, multilabel_logits = model(b_input_ids, b_attn_mask)
+
+            # Compute losses
+            regression_loss = regression_loss_fn(regression_logits.squeeze(), b_regression_labels)
+            multilabel_loss = multilabel_loss_fn(multilabel_logits, b_multilabel_labels)
+            loss = regression_loss + multilabel_loss
+
+            # Backward pass and optimization
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)  # Gradient clipping
+            optimizer.step()
+            scheduler.step()
+
+            # Accumulate losses
+            total_regression_loss += regression_loss.item()
+            total_multilabel_loss += multilabel_loss.item()
+
+        # Calculate average losses
+        avg_regression_loss = total_regression_loss / len(train_dataloader)
+        avg_multilabel_loss = total_multilabel_loss / len(train_dataloader)
+        elapsed_time = time.time() - t0_epoch
+
+        print(f"{'Average':<8}{avg_regression_loss:<20.6f}{avg_multilabel_loss:<25.6f}{elapsed_time:<9.2f}")
+
+        # Evaluate on validation data
+        if val_dataloader:
+            evaluate(model, val_dataloader)
+
+# Update evaluation to handle the dual task
+def evaluate(model, val_dataloader):
+    model.eval()
+    total_regression_loss, total_multilabel_loss = 0, 0
+    with torch.no_grad():
+        for batch in val_dataloader:
+            b_input_ids, b_attn_mask, b_regression_labels, b_multilabel_labels = tuple(t.to(device) for t in batch)
+            regression_logits, multilabel_logits = model(b_input_ids, b_attn_mask)
+
+            # Compute losses
+            regression_loss = regression_loss_fn(regression_logits.squeeze(), b_regression_labels)
+            multilabel_loss = multilabel_loss_fn(multilabel_logits, b_multilabel_labels)
+
+            total_regression_loss += regression_loss.item()
+            total_multilabel_loss += multilabel_loss.item()
+
+    avg_regression_loss = total_regression_loss / len(val_dataloader)
+    avg_multilabel_loss = total_multilabel_loss / len(val_dataloader)
+    print(f"Validation Binary Loss: {avg_regression_loss:.6f}")
+    print(f"Validation Multilabel Loss: {avg_multilabel_loss:.6f}\n")
+
+# Initialize the updated model, optimizer, and scheduler
+model = BertClassifier(freeze_bert=False).to(device)
+optimizer = AdamW(model.parameters(), lr=learning_rate, eps=1e-8)
+total_steps = len(train_dataloader) * num_epochs
+scheduler = get_scheduler("linear", optimizer=optimizer, num_warmup_steps=0, num_training_steps=total_steps)
+
+# Start training
+train(model, train_dataloader, test_dataloader, epochs=num_epochs)
