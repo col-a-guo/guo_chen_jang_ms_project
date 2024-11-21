@@ -189,7 +189,7 @@ def train(model, train_dataloader, val_dataloader=None, epochs=4):
                 print(f"{step:<8}{variable_loss.item():<12.6f}{multi_label_loss.item():<18.6f}{loss.item():<12.6f}{elapsed:<9.2f}")
 
         # Average loss for this epoch
-        avg_loss = total_loss / len(train_dataloader)
+        avg_loss = total_loss / len(train_dataloader) /2
         avg_variable_loss = total_variable_loss / len(train_dataloader)
         avg_multi_label_loss = total_multi_label_loss / len(train_dataloader)
 
