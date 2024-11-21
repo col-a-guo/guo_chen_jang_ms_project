@@ -114,29 +114,40 @@ test_dataloader = DataLoader(test_data, batch_size=16)
 # Initialize model, optimizer, and scheduler
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# You can toggle the mode here: 'regression' or 'multiclass'
-mode = 'multiclass'  # Change this to 'regression' to toggle the mode
-model = BertClassifier(mode=mode, freeze_bert=False).to(device)
+model = BertClassifier(mode=default_mode, freeze_bert=False).to(device)
 optimizer = AdamW(model.parameters(), lr=3e-5, eps=1e-8)
 num_epochs = 3
 total_steps = len(train_dataloader) * num_epochs
 scheduler = get_scheduler("linear", optimizer=optimizer, num_warmup_steps=0, num_training_steps=total_steps)
+# Global mode variable (toggle between regression and multiclass)
+default_mode = 'regression'  # Default to regression, can switch to 'multiclass'
 
-# Define the loss function for regression classification and multi-label classification
-regression_loss_fn = nn.MSELoss()  # MSE for regression
+# Define loss functions
+mse_loss_fn = nn.MSELoss()  # MSE for regression
+cross_entropy_loss_fn = nn.CrossEntropyLoss()  # CrossEntropy for multiclass classification
 multi_label_loss_fn = nn.BCEWithLogitsLoss()  # Multi-label Binary Cross Entropy Loss with Logits
+
+# Variable loss function that switches between regression and multiclass
+def variable_loss_fn(logits, labels):
+    if default_mode == 'regression':
+        return mse_loss_fn(logits.view(-1, 1), labels)  # For regression, MSE loss
+    elif default_mode == 'multiclass':
+        return cross_entropy_loss_fn(logits.view(-1, 3), labels)  # For multiclass, CrossEntropy loss
+    else:
+        raise ValueError(f"Unsupported mode: {default_mode}")
+
 # Training loop
 def train(model, train_dataloader, val_dataloader=None, epochs=4):
     print("Starting training...\n")
     for epoch in range(epochs):
         print(f"Epoch {epoch+1}/{epochs}")
-        print(f"{'Batch':<8}{'Reg Loss':<12}{'Multilabel Loss':<18}{'Avg Loss':<12}{'Elapsed':<9}")
+        print(f"{'Batch':<8}{'Variable Loss':<12}{'Multilabel Loss':<18}{'Avg Loss':<12}{'Elapsed':<9}")
         print("-" * 60)
 
         model.train()
         t0_epoch = time.time()
         total_loss = 0
-        total_regression_loss = 0
+        total_variable_loss = 0
         total_multi_label_loss = 0
 
         for step, batch in enumerate(train_dataloader):
@@ -149,16 +160,18 @@ def train(model, train_dataloader, val_dataloader=None, epochs=4):
             # Perform a forward pass
             regression_logits, multi_label_logits = model(b_input_ids, b_attn_mask)
 
-            # Compute regression and multi-label losses
-            regression_loss = regression_loss_fn(regression_logits.view(-1, 1), b_regression_labels)  # 1 for regression
+            # Compute multi-label loss first (this will always be used)
             multi_label_loss = multi_label_loss_fn(multi_label_logits, b_multi_labels)
 
-            # Combine the two losses (optional weighting can be added)
-            loss = (regression_loss + multi_label_loss) / 2
+            # Use variable_loss_fn to calculate either regression or multiclass loss
+            variable_loss = variable_loss_fn(regression_logits, b_regression_labels) if default_mode == 'regression' else variable_loss_fn(multi_label_logits.view(-1, 3), b_multi_labels)
+
+            # Total loss is the sum of variable loss and multi-label loss
+            loss = variable_loss + multi_label_loss
 
             # Accumulate total losses for this batch
             total_loss += loss.item()
-            total_regression_loss += regression_loss.item()
+            total_variable_loss += variable_loss.item()
             total_multi_label_loss += multi_label_loss.item()
 
             # Perform a backward pass
@@ -173,15 +186,15 @@ def train(model, train_dataloader, val_dataloader=None, epochs=4):
 
             if step % 10 == 0:
                 elapsed = time.time() - t0_epoch
-                print(f"{step:<8}{regression_loss.item():<12.6f}{multi_label_loss.item():<18.6f}{loss.item():<12.6f}{elapsed:<9.2f}")
+                print(f"{step:<8}{variable_loss.item():<12.6f}{multi_label_loss.item():<18.6f}{loss.item():<12.6f}{elapsed:<9.2f}")
 
         # Average loss for this epoch
         avg_loss = total_loss / len(train_dataloader)
-        avg_regression_loss = total_regression_loss / len(train_dataloader)
+        avg_variable_loss = total_variable_loss / len(train_dataloader)
         avg_multi_label_loss = total_multi_label_loss / len(train_dataloader)
 
         print(f"\nEpoch {epoch+1} - Average losses:")
-        print(f"Reg Loss: {avg_regression_loss:.6f}")
+        print(f"Variable Loss: {avg_variable_loss:.6f}")
         print(f"Multilabel Loss: {avg_multi_label_loss:.6f}")
         print(f"Avg Loss: {avg_loss:.6f}")
 
@@ -189,12 +202,11 @@ def train(model, train_dataloader, val_dataloader=None, epochs=4):
         if val_dataloader:
             evaluate(model, val_dataloader)
 
-
-# Evaluation function (no change needed here, except maybe for detailed loss reporting)
+# Evaluation function (similar logic as training, dynamic loss computation)
 def evaluate(model, val_dataloader):
     model.eval()
     total_loss = 0
-    total_regression_loss = 0
+    total_variable_loss = 0
     total_multi_label_loss = 0
 
     with torch.no_grad():
@@ -204,20 +216,25 @@ def evaluate(model, val_dataloader):
             # Perform forward pass
             regression_logits, multi_label_logits = model(b_input_ids, b_attn_mask)
 
-            # Compute losses
-            regression_loss = regression_loss_fn(regression_logits.view(-1, 1), b_regression_labels)
+            # Compute multi-label loss first (this will always be used)
             multi_label_loss = multi_label_loss_fn(multi_label_logits, b_multi_labels)
 
+            # Use variable_loss_fn to calculate either regression or multiclass loss
+            variable_loss = variable_loss_fn(regression_logits, b_regression_labels) if default_mode == 'regression' else variable_loss_fn(multi_label_logits, b_multi_labels)
+
+            # Total loss is the sum of variable loss and multi-label loss
+            loss = variable_loss + multi_label_loss
+
             # Aggregate total loss
-            total_loss += (regression_loss + multi_label_loss).item()
-            total_regression_loss += regression_loss.item()
+            total_loss += loss.item()
+            total_variable_loss += variable_loss.item()
             total_multi_label_loss += multi_label_loss.item()
 
     avg_loss = total_loss / len(val_dataloader)
-    avg_regression_loss = total_regression_loss / len(val_dataloader)
+    avg_variable_loss = total_variable_loss / len(val_dataloader)
     avg_multi_label_loss = total_multi_label_loss / len(val_dataloader)
 
-    print(f"Validation Results - Loss: {avg_loss:.6f}, Reg Loss: {avg_regression_loss:.6f}, Multi-label Loss: {avg_multi_label_loss:.6f}")
+    print(f"Validation Results - Loss: {avg_loss:.6f}, Variable Loss: {avg_variable_loss:.6f}, Multi-label Loss: {avg_multi_label_loss:.6f}")
 
 # Start training
 train(model, train_dataloader, epochs=3)
