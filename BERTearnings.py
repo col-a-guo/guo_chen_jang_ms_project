@@ -6,15 +6,18 @@ from transformers import AdamW, get_scheduler
 from datasets import load_dataset
 import time
 
+default_mode = 'multiclass'
 class BertClassifier(nn.Module):
-    """Bert Model for Regression and Multi-label Tasks."""
-    def __init__(self, freeze_bert=False):
+    """Bert Model for Regression, Multi-class and Multi-label Tasks."""
+    def __init__(self, mode=default_mode, freeze_bert=False):
         """
-        @param freeze_bert (bool): Set `False` to fine-tune the BERT model.
+        @param mode (str): 'regression' or 'multiclass'. Determines whether to run regression or multi-class classification.
+        @param freeze_bert (bool): Set False to fine-tune the BERT model.
         """
         super(BertClassifier, self).__init__()
         D_in, H = 768, 50  # BERT hidden size is 768
-        num_classes = 1  # Regression
+        self.mode = mode  # 'regression' or 'multiclass'
+        num_classes = 1 if mode == 'regression' else 3  # Default: regression, else multiclass (change as needed)
 
         # Load the BusinessBERT model
         self.bert = AutoModelForSequenceClassification.from_pretrained('pborchert/BusinessBERT', num_labels=num_classes)
@@ -45,12 +48,13 @@ class BertClassifier(nn.Module):
         cls_token_embedding = last_hidden_state[:, 0, :]  # Extract the [CLS] token's embedding
 
         # Multi-class classification logits (using the logits directly from BERT)
-        regression_logits = outputs.logits
-
-        # Multi-label classification logits (using a custom head)
-        multi_label_logits = self.multi_label_classifier(cls_token_embedding)
-
-        return regression_logits, multi_label_logits
+        if self.mode == 'regression':
+            regression_logits = outputs.logits
+            return regression_logits, self.multi_label_classifier(cls_token_embedding)
+        
+        elif self.mode == 'multiclass':
+            multiclass_logits = outputs.logits  # This will be used for multiclass classification (could modify num_classes)
+            return multiclass_logits, self.multi_label_classifier(cls_token_embedding)
 
 
 # Load the tokenizer
@@ -82,11 +86,11 @@ class CustomDataset(Dataset):
         input_ids = torch.tensor(item['input_ids'])
         attention_mask = torch.tensor(item['attention_mask'])
 
-        # Multi-class label
-        regression_label = torch.tensor(item['label'], dtype=torch.float)  # Classification labels
+        # Multi-class label (For regression, label is used as continuous, for multiclass as one-hot or categorical)
+        regression_label = torch.tensor(item['label'], dtype=torch.float)  # Regression label (continuous)
 
         # Multi-label features
-        multi_labels = torch.tensor([
+        multi_labels = torch.tensor([ 
             item["scarcity"],
             item["nonuniform_progress"],
             item["performance_constraints"],
@@ -101,7 +105,6 @@ class CustomDataset(Dataset):
 
         return input_ids, attention_mask, regression_label, multi_labels
 
-
 train_data = CustomDataset(train_dataset)
 test_data = CustomDataset(test_dataset)
 
@@ -110,7 +113,10 @@ test_dataloader = DataLoader(test_data, batch_size=16)
 
 # Initialize model, optimizer, and scheduler
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model = BertClassifier(freeze_bert=False).to(device)
+
+# You can toggle the mode here: 'regression' or 'multiclass'
+mode = 'multiclass'  # Change this to 'regression' to toggle the mode
+model = BertClassifier(mode=mode, freeze_bert=False).to(device)
 optimizer = AdamW(model.parameters(), lr=3e-5, eps=1e-8)
 num_epochs = 3
 total_steps = len(train_dataloader) * num_epochs
@@ -202,18 +208,16 @@ def evaluate(model, val_dataloader):
             regression_loss = regression_loss_fn(regression_logits.view(-1, 1), b_regression_labels)
             multi_label_loss = multi_label_loss_fn(multi_label_logits, b_multi_labels)
 
-            # Add losses to totals
+            # Aggregate total loss
             total_loss += (regression_loss + multi_label_loss).item()
             total_regression_loss += regression_loss.item()
             total_multi_label_loss += multi_label_loss.item()
 
-    avg_loss = total_loss / 2 / len(val_dataloader)
+    avg_loss = total_loss / len(val_dataloader)
     avg_regression_loss = total_regression_loss / len(val_dataloader)
     avg_multi_label_loss = total_multi_label_loss / len(val_dataloader)
 
-    print(f"Validation - Reg Loss: {avg_regression_loss:.6f}")
-    print(f"Validation - Multilabel Loss: {avg_multi_label_loss:.6f}")
-    print(f"Validation - Avg Loss: {avg_loss:.6f}\n")
+    print(f"Validation Results - Loss: {avg_loss:.6f}, Reg Loss: {avg_regression_loss:.6f}, Multi-label Loss: {avg_multi_label_loss:.6f}")
 
-#Start training
-train(model, train_dataloader, test_dataloader, epochs=num_epochs)
+# Start training
+train(model, train_dataloader, epochs=3)
