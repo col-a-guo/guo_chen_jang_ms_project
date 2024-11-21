@@ -119,18 +119,19 @@ scheduler = get_scheduler("linear", optimizer=optimizer, num_warmup_steps=0, num
 # Define the loss function for regression classification and multi-label classification
 regression_loss_fn = nn.MSELoss()  # MSE for regression
 multi_label_loss_fn = nn.BCEWithLogitsLoss()  # Multi-label Binary Cross Entropy Loss with Logits
-
 # Training loop
 def train(model, train_dataloader, val_dataloader=None, epochs=4):
     print("Starting training...\n")
     for epoch in range(epochs):
         print(f"Epoch {epoch+1}/{epochs}")
-        print(f"{'Batch':<8}{'Train Loss':<12}{'Elapsed':<9}")
-        print("-" * 35)
+        print(f"{'Batch':<8}{'Reg Loss':<12}{'Multilabel Loss':<18}{'Avg Loss':<12}{'Elapsed':<9}")
+        print("-" * 60)
 
         model.train()
         t0_epoch = time.time()
         total_loss = 0
+        total_regression_loss = 0
+        total_multi_label_loss = 0
 
         for step, batch in enumerate(train_dataloader):
             # Load batch to GPU
@@ -149,7 +150,10 @@ def train(model, train_dataloader, val_dataloader=None, epochs=4):
             # Combine the two losses (optional weighting can be added)
             loss = (regression_loss + multi_label_loss) / 2
 
+            # Accumulate total losses for this batch
             total_loss += loss.item()
+            total_regression_loss += regression_loss.item()
+            total_multi_label_loss += multi_label_loss.item()
 
             # Perform a backward pass
             loss.backward()
@@ -163,20 +167,30 @@ def train(model, train_dataloader, val_dataloader=None, epochs=4):
 
             if step % 10 == 0:
                 elapsed = time.time() - t0_epoch
-                print(f"{step:<8}{loss.item():<12.6f}{elapsed:<9.2f}")
+                print(f"{step:<8}{regression_loss.item():<12.6f}{multi_label_loss.item():<18.6f}{loss.item():<12.6f}{elapsed:<9.2f}")
 
         # Average loss for this epoch
         avg_loss = total_loss / len(train_dataloader)
-        print(f"\nEpoch {epoch+1} - Average training loss: {avg_loss:.6f}")
+        avg_regression_loss = total_regression_loss / len(train_dataloader)
+        avg_multi_label_loss = total_multi_label_loss / len(train_dataloader)
+
+        print(f"\nEpoch {epoch+1} - Average losses:")
+        print(f"Reg Loss: {avg_regression_loss:.6f}")
+        print(f"Multilabel Loss: {avg_multi_label_loss:.6f}")
+        print(f"Avg Loss: {avg_loss:.6f}")
 
         # Evaluate model on validation data (if provided)
         if val_dataloader:
             evaluate(model, val_dataloader)
 
 
+# Evaluation function (no change needed here, except maybe for detailed loss reporting)
 def evaluate(model, val_dataloader):
     model.eval()
     total_loss = 0
+    total_regression_loss = 0
+    total_multi_label_loss = 0
+
     with torch.no_grad():
         for batch in val_dataloader:
             b_input_ids, b_attn_mask, b_regression_labels, b_multi_labels = [t.to(device) for t in batch]
@@ -185,15 +199,21 @@ def evaluate(model, val_dataloader):
             regression_logits, multi_label_logits = model(b_input_ids, b_attn_mask)
 
             # Compute losses
-            regression_loss = regression_loss_fn(regression_logits.view(-1, 1), b_regression_labels)  # 1 for regression
-
+            regression_loss = regression_loss_fn(regression_logits.view(-1, 1), b_regression_labels)
             multi_label_loss = multi_label_loss_fn(multi_label_logits, b_multi_labels)
-            loss = regression_loss + multi_label_loss
-            total_loss += loss.item()
 
-    avg_loss = total_loss / len(val_dataloader)
-    print(f"Validation loss: {avg_loss:.6f}\n")
+            # Add losses to totals
+            total_loss += (regression_loss + multi_label_loss).item()
+            total_regression_loss += regression_loss.item()
+            total_multi_label_loss += multi_label_loss.item()
 
+    avg_loss = total_loss / 2 / len(val_dataloader)
+    avg_regression_loss = total_regression_loss / len(val_dataloader)
+    avg_multi_label_loss = total_multi_label_loss / len(val_dataloader)
 
-# Start training
+    print(f"Validation - Reg Loss: {avg_regression_loss:.6f}")
+    print(f"Validation - Multilabel Loss: {avg_multi_label_loss:.6f}")
+    print(f"Validation - Avg Loss: {avg_loss:.6f}\n")
+
+#Start training
 train(model, train_dataloader, test_dataloader, epochs=num_epochs)
