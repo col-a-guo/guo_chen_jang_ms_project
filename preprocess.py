@@ -32,7 +32,8 @@ def convert_invalid_int_strings_to_nan(val):
             return val  # Keep the valid string
         except ValueError:
             # If conversion fails, return NaN
-            return np.NaN
+            print("failed to convert"+val)
+            return np.nan
     return val  # If not a string, leave it as is
 
 
@@ -55,7 +56,7 @@ columns_to_keep = [
     "user_heterogeneity", "cognitive", "external", "internal",
     "coordination", "technical", "demand", "paragraph", "source", "length_approx"
 ]
-data = data[columns_to_keep]
+data = data[columns_to_keep].fillna(0)
 
 # "word_count" - Counts words by spaces in "paragraph" and winsorizes outliers
 data["word_count"] = data["paragraph"].str.count(" ") + 1
