@@ -24,29 +24,30 @@ labels_for_quad = [
     "transactional"
 ]
 
-# Define additional features to include in training
-control_features = ["number_of_types", "word_count", "source"]
+# Define control variables
+control_features = ["number_of_types", "word_count"]
 
-# Combine labels_for_quad and control_features for polynomial generation
-all_features_for_poly = labels_for_quad + control_features
+# Combine labels and controls for polynomial feature generation
+features_for_poly = labels_for_quad + control_features
 
-# Generate polynomial features
+# Generate polynomial features using both `labels_for_quad` and `control_features`
 poly = PolynomialFeatures(degree=2, include_bias=False)
-poly_features = poly.fit_transform(data[all_features_for_poly])
-poly_feature_names = poly.get_feature_names_out(all_features_for_poly)
+poly_features = poly.fit_transform(data[features_for_poly])
+poly_feature_names = poly.get_feature_names_out(features_for_poly)
 
 # Create a DataFrame for polynomial features
-poly_df = pd.DataFrame(poly_features, columns=poly_feature_names)
+X = pd.DataFrame(poly_features, columns=poly_feature_names)
 
-# Use only polynomial features as `X`
-X = poly_df
+# Define the target variable
 y = data["label"].astype(int)
+
 
 # Scale the features
 scaler = MinMaxScaler()
 X = pd.DataFrame(scaler.fit_transform(X), columns=X.columns)
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
 
+# Oversample the training data
 def oversample_training_data(X, y, random_state=42):
     ros = RandomOverSampler(random_state=random_state)
     return ros.fit_resample(X, y)
@@ -99,7 +100,7 @@ def iterative_feature_dropping(X_train, y_train, X_test, y_test, stacking_clf, i
     return surviving_features
 
 # Run iterative feature dropping
-surviving_features = iterative_feature_dropping(X_train, y_train, X_test, y_test, stacking_clf, iterations=5, drop_percent=0.1)
+surviving_features = iterative_feature_dropping(X_train, y_train, X_test, y_test, stacking_clf, iterations=5, drop_percent=0.15)
 
 # Final training with surviving features
 stacking_clf.fit(X_train[surviving_features], y_train)
