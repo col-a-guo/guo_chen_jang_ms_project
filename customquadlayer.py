@@ -6,7 +6,9 @@ from sklearn.model_selection import train_test_split
 from imblearn.over_sampling import RandomOverSampler
 from imblearn.under_sampling import RandomUnderSampler
 from sklearn.metrics import classification_report
+from sklearn.inspection import permutation_importance
 import numpy as np
+import matplotlib.pyplot as plt
 
 # Load and preprocess the data
 data = pd.read_csv("combined.csv")
@@ -25,16 +27,19 @@ labels_for_quad = [
 # Define additional features to include in training
 control_features = ["number_of_types", "word_count", "source"]
 
-# Generate polynomial features for `labels_for_quad`
+# Combine labels_for_quad and control_features for polynomial generation
+all_features_for_poly = labels_for_quad + control_features
+
+# Generate polynomial features
 poly = PolynomialFeatures(degree=2, include_bias=False)
-quad_features = poly.fit_transform(data[labels_for_quad])
-quad_feature_names = poly.get_feature_names_out(labels_for_quad)
+poly_features = poly.fit_transform(data[all_features_for_poly])
+poly_feature_names = poly.get_feature_names_out(all_features_for_poly)
 
 # Create a DataFrame for polynomial features
-quad_df = pd.DataFrame(quad_features, columns=quad_feature_names)
+poly_df = pd.DataFrame(poly_features, columns=poly_feature_names)
 
-# Combine polynomial features with control and exclude duplicate original features
-X = pd.concat([quad_df, data[control_features]], axis=1)
+# Use only polynomial features as `X`
+X = poly_df
 y = data["label"].astype(int)
 
 # Scale the features
@@ -62,7 +67,7 @@ def undersample_test_data(X, y, sampling_strategy, random_state=42):
 
 X_test, y_test = undersample_test_data(X_test, y_test, sampling_strategy, random_state=42)
 
-# Define and train the StackingClassifier
+# Define the StackingClassifier
 rf = RandomForestClassifier(n_estimators=100, random_state=42)
 lr = LogisticRegression(penalty='l2', solver='saga', max_iter=10000, random_state=42)
 
@@ -71,11 +76,52 @@ stacking_clf = StackingClassifier(
     final_estimator=lr
 )
 
-stacking_clf.fit(X_train, y_train)
+# Iterative feature dropping
+def iterative_feature_dropping(X_train, y_train, X_test, y_test, stacking_clf, iterations=5, drop_percent=0.1):
+    surviving_features = X_train.columns.tolist()
+    
+    for iteration in range(iterations):
+        stacking_clf.fit(X_train[surviving_features], y_train)
+        perm_importance = permutation_importance(stacking_clf, X_test[surviving_features], y_test, n_repeats=10, random_state=42)
+        importance_df = pd.DataFrame({
+            'Feature': surviving_features,
+            'Importance': perm_importance.importances_mean
+        }).sort_values(by='Importance', ascending=True)
+        
+        # Drop the bottom `drop_percent` of features
+        num_features_to_drop = max(1, int(len(surviving_features) * drop_percent))
+        features_to_drop = importance_df.head(num_features_to_drop)['Feature'].tolist()
+        surviving_features = [f for f in surviving_features if f not in features_to_drop]
+        
+        print(f"Iteration {iteration + 1}: Dropped {len(features_to_drop)} features")
+        print(f"Remaining features: {len(surviving_features)}")
+    
+    return surviving_features
 
-# Make predictions
-y_pred = stacking_clf.predict(X_test)
+# Run iterative feature dropping
+surviving_features = iterative_feature_dropping(X_train, y_train, X_test, y_test, stacking_clf, iterations=5, drop_percent=0.1)
+
+# Final training with surviving features
+stacking_clf.fit(X_train[surviving_features], y_train)
+y_pred = stacking_clf.predict(X_test[surviving_features])
 
 # Classification report
 print("Classification Report:")
 print(classification_report(y_test, y_pred))
+
+# Final permutation importance for surviving features
+perm_importance = permutation_importance(stacking_clf, X_test[surviving_features], y_test, n_repeats=10, random_state=42)
+importance_df = pd.DataFrame({
+    'Feature': surviving_features,
+    'Importance': perm_importance.importances_mean
+}).sort_values(by='Importance', ascending=False)
+
+# Plot the permutation importance
+plt.figure(figsize=(10, 6))
+plt.barh(importance_df['Feature'], importance_df['Importance'], align='center')
+plt.xlabel('Permutation Importance')
+plt.ylabel('Features')
+plt.title('Feature Importance from StackingClassifier (After Iterative Dropping)')
+plt.gca().invert_yaxis()
+plt.tight_layout()
+plt.show()
