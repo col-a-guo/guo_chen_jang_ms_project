@@ -1,108 +1,68 @@
-#general strategy:
-
-#randomforest -> quadratic -> predict
-#see here for polynomialfeatures https://stackoverflow.com/questions/72931145/how-to-apply-polynomialfeatures-only-to-certain-not-all-independent-variables
-#with depth = 2 this should do it easily
-
-#additional things to output for interpretation:
-# - RF layer outputs, weights
-
-#irises for structure
-# importing random forest classifier from assemble module
 from sklearn.ensemble import RandomForestClassifier
 import pandas as pd
-from sklearn.preprocessing import PolynomialFeatures, MinMaxScaler
-from sklearn import metrics  
-from sklearn import datasets
-from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import cross_val_score
-from sklearn.model_selection import RepeatedStratifiedKFold
-from sklearn.feature_selection import RFE
-from sklearn.pipeline import Pipeline
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import train_test_split, cross_validate
-from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.metrics import classification_report
+from sklearn.model_selection import train_test_split
+from imblearn.over_sampling import RandomOverSampler
+from imblearn.under_sampling import RandomUnderSampler
 import matplotlib.pyplot as plt
-import numpy as np
 
-data = pd.read_csv("guo_chen_jang_ms_project//streaming.csv")
-#TODO: Automate data cleaning
-# - Regex for alpha after newline: [^0-9^,^"]+ and then ctrl alt enter
-# - Find multistage and make something else
-data.stage = data.stage.apply(pd.to_numeric,errors='coerce')
-data.paragraph = data.paragraph.apply(lambda x: len(x))
-data = data.dropna()
+combined = pd.read_csv("combined.csv")
+
+features = [
+    "transactional", "scarcity", "nonuniform_progress", "performance_constraints",
+    "user_heterogeneity", "cognitive", "external", "internal",
+    "coordination", "technical", "demand"
+]
+
+combined = combined.fillna(0)
+
+X = combined[features]
+y = combined["label"]
 
 scaler = MinMaxScaler()
+X = pd.DataFrame(scaler.fit_transform(X), columns=X.columns)
 
-# Fit and transform the data
-data = pd.DataFrame(scaler.fit_transform(data), columns=data.columns)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
 
-print(data)
+def oversample_training_data(X, y, random_state=42):
+    ros = RandomOverSampler(random_state=random_state)
+    return ros.fit_resample(X, y)
 
-y = data.loc[:,"stage"].astype(int)
+X_train, y_train = oversample_training_data(X_train, y_train, random_state=42)
 
-y.fillna(0)
+# Calculate sampling strategy based on initial distribution
+initial_label_counts = y.value_counts()
+sampling_strategy = {
+    label: int(initial_label_counts[label] * len(y_test) / len(y) *0.9) #multiply by 0.9 to ensure the count is low enough even with randomness
+    for label in initial_label_counts.index
+}
 
-X = data[["scarcity", "nonuniform_progress", "performance_constraints", 
-"user heterogeneity", "cognitive", "external", "internal", "coordination", "technical", "demand", "paragraph"]]
+# undersample test data back to original distribution
+def undersample_test_data(X, y, sampling_strategy, random_state=42):
+    rus = RandomUnderSampler(sampling_strategy=sampling_strategy, random_state=random_state)
+    return rus.fit_resample(X, y)
 
-#replace nans with means
-# Splitting arrays or matrices into random train and test subsets
-# i.e. 70 % training dataset and 30 % test datasets
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.20)
+X_test, y_test = undersample_test_data(X_test, y_test, sampling_strategy, random_state=42)
 
-
-# creating dataframe of IRIS dataset
-
-
-# #turn features into polynomial versions
-# poly = PolynomialFeatures(2)
-# poly_X_train = poly.fit_transform(X_train)
-
-# poly_X_test = poly.fit_transform(X_test)
-
-clf = RandomForestClassifier(n_estimators = 30)
- 
-# # Training the model on the training dataset
-# # fit function is used to train the model using the training sets as parameters
+clf = RandomForestClassifier(n_estimators=100, random_state=42)
 clf.fit(X_train, y_train)
 
-# z_train = y_train
-# z_test = y_test
-
-# clf2 = LogisticRegression(penalty='l2')
-
-# clf2.fit(clf.predict(poly_X_train).reshape(-1,1), z_train.reshape(-1,1))
- 
-# performing predictions on the test dataset
 y_pred = clf.predict(X_test)
+print("Classification Report for Combined Dataset:")
+print(classification_report(y_test, y_pred))
 
-importances = clf.feature_importances_
- 
+feature_importances = clf.feature_importances_
+feature_importance_df = pd.DataFrame({
+    'Feature': features,
+    'Importance': feature_importances
+}).sort_values(by='Importance', ascending=False)
 
-# using metrics module for accuracy calculation
-print("ACCURACY OF THE MODEL:", metrics.classification_report(y_test, y_pred))
-
-label = LabelEncoder()
-data['stage'] = label.fit_transform(data['stage'])
-data['stage'].value_counts()
-
-
-#RFE feature importance
-rfe = RFE(estimator=RandomForestClassifier(), n_features_to_select=4)
-model = RandomForestClassifier() # instantiate a model
-pipeline = Pipeline(steps=[('Feature Selection', rfe), ('Model', model)])
-
-# evaluate the model
-cv = RepeatedStratifiedKFold(n_splits=10, n_repeats=5, random_state=1)
-results = cross_validate(pipeline, X, y, scoring='accuracy', cv=cv, return_estimator=True)
-n_scores = cross_validate(pipeline, X, y, scoring='accuracy', cv=cv, n_jobs=1)
-
-for iter, pipe in enumerate(results['estimator']):
-    print(f'Iteration no: {iter}')
-    for i in range(X.shape[1]):
-        print('Column: %s, Selected %s, Rank: %d' %
-            (X.columns[i], pipe['Feature Selection'].support_[i], pipe['Feature Selection'].ranking_[i]))
-
-print(n_scores)
+plt.figure(figsize=(10, 6))
+plt.barh(feature_importance_df['Feature'], feature_importance_df['Importance'], align='center')
+plt.xlabel('Feature Importance')
+plt.ylabel('Features')
+plt.title('Feature Importances from Random Forest')
+plt.gca().invert_yaxis()
+plt.tight_layout()
+plt.show()
