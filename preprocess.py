@@ -5,10 +5,8 @@ import numpy as np
 
 # List of file paths
 og_paths = [
-    #"new_multichannel.csv",
-    #"streaming.csv",
-    "multichannel.csv"
-    # Add more paths as needed
+    "dec_5_multichannel_combined.csv",
+    "dec_5_streaming_combined.csv"
 ]
 
 # Initialize an empty list to hold dataframes
@@ -52,9 +50,14 @@ data['label'] = data['label'].map(lambda x: f"{x:.1f}")
 
 # Columns to keep for further processing
 columns_to_keep = [
-    "label", "transactional", "scarcity", "nonuniform_progress", "performance_constraints",
-    "user_heterogeneity", "cognitive", "external", "internal",
-    "coordination", "technical", "demand", "paragraph", "source", "length_approx"
+        "scarcity", "nonuniform_progress", "performance_constraints", "user_heterogeneity", 
+        "cognitive", "external", "internal", "coordination", "transactional", "technical", 
+        "demand", "2500partner", "singlepartner", "content_production", "data_center/storage", 
+        "Internet_infra", "content_distribution", "browsers,_apps_&_smart_devices", 
+        "advertising", "end_users", "external_partners", "substitutional_partners",
+        "paragraph", #Special
+        "label", #Y
+        "source", "length_approx", "singlebott" #Control/utility
 ]
 data = data[columns_to_keep].fillna(0)
 
@@ -71,7 +74,7 @@ type_columns = [
 data["number_of_types"] = data[type_columns].sum(axis=1) / 10
 
 # Save the combined data
-data.to_csv("multichannel_search.csv", index=False)
+data.to_csv("dec_5_combined.csv", index=False)
 
 # Split into train and test datasets
 train_df, test_df = train_test_split(data, test_size=0.2, random_state=1, stratify=data['label'])
