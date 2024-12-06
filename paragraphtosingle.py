@@ -17,15 +17,26 @@ filtered_data["paragraph"] = filtered_data["paragraph"].fillna("")
 
 # Define the features and targets
 X_text = filtered_data["paragraph"]
-y = filtered_data[
-    [
-        "scarcity", "nonuniform_progress", "performance_constraints", "user_heterogeneity", 
-        "cognitive", "external", "internal", "coordination", "transactional", "technical", 
-        "demand", "2500partner", "singlepartner", "content_production", "data_center/storage", 
-        "Internet_infra", "content_distribution", "browsers,_apps_&_smart_devices", 
-        "advertising", "end_users", "external_partners", "substitutional_partners"
-    ]
+
+
+numeric_features = [
+    "scarcity",
+    "cognitive",
+    "external",
+    "coordination",
+    "transactional"
 ]
+multi_label_targets = [
+    "transactional", "scarcity", "nonuniform_progress", "performance_constraints",
+    "user_heterogeneity", "cognitive", "external", "internal",
+    "coordination", "technical", "demand"
+]
+
+# for i in numeric_features:
+#     multi_label_targets.remove(i)
+# Define labels for polynomial features
+
+y = filtered_data[multi_label_targets]
 
 # Convert 'paragraph' text data to TF-IDF features
 vectorizer = TfidfVectorizer(max_features=5000)  # Limit to top 5000 features for efficiency
@@ -73,9 +84,21 @@ for label in y.columns:
 # Convert results to a DataFrame for aligned column output
 metrics_df = pd.DataFrame(metrics_results)
 metrics_df = metrics_df.sort_values(by="name")
+# Plot F1-scores as a horizontal bar chart and save it with a specified resolution
+plt.figure(figsize=(12, 8))  # Adjusted figure size for desired resolution
+plt.barh(metrics_df["name"], metrics_df["f1-score"], color='skyblue', label="F1 Scores")
 
-# Display metrics
-print(f"{'Name':<30}{'Precision':<15}{'Recall':<15}{'F1-Score':<15}{'Support':<10}{'True Pos':<10}{'True Neg':<10}{'False Pos':<10}{'False Neg':<10}")
-print("=" * 110)
-for _, row in metrics_df.iterrows():
-    print(f"{row['name']:<30}{row['precision']:<15.4f}{row['recall']:<15.4f}{row['f1-score']:<15.4f}{row['support']:<10}{int(row['true positives']):<10}{int(row['true negatives']):<10}{int(row['false positives']):<10}{int(row['false negatives']):<10}")
+# Add a vertical dotted line at 0.88
+plt.axvline(x=0.88, color='red', linestyle='--', label="Stage Accuracy (0.88)")
+
+# Customize the plot
+plt.title("Seperate TDIDF paragraph for specific bottleneck, then 11 features for stage prediction", fontsize=14)
+plt.xlabel("F1 Score", fontsize=12)
+plt.ylabel("Labels", fontsize=12)
+plt.xlim(0, 1)  # Ensure x-axis goes from 0 to 1
+plt.legend()
+plt.tight_layout()
+
+# Save the plot as a PNG with 1200x800 resolution
+plt.savefig("f1_scores_horizontal.png", dpi=100, bbox_inches='tight')  # dpi=100 ensures 1200x800 resolution
+plt.show()

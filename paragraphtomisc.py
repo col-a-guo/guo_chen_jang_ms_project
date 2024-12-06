@@ -8,7 +8,7 @@ from imblearn.under_sampling import RandomUnderSampler
 import matplotlib.pyplot as plt
 
 # Load the dataset
-combined = pd.read_csv("dec_5_combined.csv")
+combined = pd.read_csv("combined.csv")
 
 # Ensure no missing values
 combined["paragraph"] = combined["paragraph"].fillna("")
