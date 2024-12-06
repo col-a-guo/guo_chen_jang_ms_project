@@ -7,7 +7,7 @@ from imblearn.over_sampling import RandomOverSampler
 from imblearn.under_sampling import RandomUnderSampler
 import matplotlib.pyplot as plt
 
-combined = pd.read_csv("combined.csv")
+combined = pd.read_csv("dec_5_combined.csv")
 
 features = [
     "transactional", "scarcity", "nonuniform_progress", "performance_constraints",
