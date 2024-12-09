@@ -3,15 +3,17 @@ import glob
 import pandas as pd
 import ast
 
-# Base directory for the file path format you provided
-base_dir = r'C:\Users\r2d2go\Downloads\csvsjang\streaming media csv subsets\Completed'
+# Base directory for the new file structure
+base_dir = r'C:\Users\r2d2go\Downloads\jangmasters\new_complete\New_Completed'
 
 # List to hold dataframes for each file
 combined_df_list = []
 
 # Loop over the years from 2007 to 2023
 for year in range(2007, 2024):
-    year_dir = os.path.join(base_dir, f'Complete_{year}')
+    # Format the year as two digits (e.g., 07 for 2007)
+    year_str = f"{year % 100:02}"
+    year_dir = os.path.join(base_dir, f'Complete_{year_str}')
     
     # Check if the directory exists
     if os.path.exists(year_dir):
@@ -46,24 +48,23 @@ for year in range(2007, 2024):
                         return stage_value  # Keep as is if not convertible
                 
                 df['stage'] = df['stage'].apply(clean_stage)
+                
                 # Append the DataFrame to the list
                 combined_df_list.append(df)
 
 # Combine all DataFrames into one
 combined_df = pd.concat(combined_df_list, ignore_index=True)
 
-# Reorder columns to move 'transactional' column first
+# Reorder columns to move 'stage' column first
 cols = combined_df.columns.tolist()
 cols.insert(0, cols.pop(cols.index('stage')))
 combined_df = combined_df[cols]
 
-combined_df.fillna(0, inplace=True)
-# Save the combined DataFrame to two locations
-output_path_1 = r'C:\Users\r2d2go\Downloads\csvsjang\streaming_combined_all_years_cleaned.csv'
-output_path_2 = r'C:\Users\r2d2go\Downloads\jangmasters\guo_chen_jang_ms_project\streaming.csv'
+# Save the combined DataFrame 
 
-# Save the cleaned CSV to both locations
-combined_df.to_csv(output_path_1, index=False)
-combined_df.to_csv(output_path_2, index=False)
+output_path = r'C:\Users\r2d2go\Downloads\jangmasters\guo_chen_jang_ms_project\dec_5_streaming_combined.csv'
 
-print(f"All CSVs combined and cleaned into {output_path_1} and {output_path_2}")
+# Save the cleaned CSV 
+combined_df.to_csv(output_path, index=False)
+
+print(f"All CSVs combined and cleaned into {output_path}")

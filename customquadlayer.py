@@ -15,6 +15,7 @@ data = pd.read_csv("combined.csv")
 data.label = data.label.apply(pd.to_numeric)
 data = data.fillna(0)
 
+
 # Define labels for polynomial features
 labels_for_quad = [
     "scarcity",
@@ -25,27 +26,26 @@ labels_for_quad = [
 ]
 
 # Define control variables
-control_features = ["number_of_types", "word_count"]
+control_features = ["number_of_types", "word_count", "source"]
 
-# Combine labels and controls for polynomial feature generation
-features_for_poly = labels_for_quad + control_features
-
-# Generate polynomial features using both `labels_for_quad` and `control_features`
+# Generate polynomial features using only `labels_for_quad`
 poly = PolynomialFeatures(degree=2, include_bias=False)
-poly_features = poly.fit_transform(data[features_for_poly])
-poly_feature_names = poly.get_feature_names_out(features_for_poly)
+poly_features = poly.fit_transform(data[labels_for_quad])
+poly_feature_names = poly.get_feature_names_out(labels_for_quad)
 
 # Create a DataFrame for polynomial features
-X = pd.DataFrame(poly_features, columns=poly_feature_names)
+X_poly = pd.DataFrame(poly_features, columns=poly_feature_names)
+
+# Add control features (as-is, first-degree) to the polynomial feature set
+X_combined = pd.concat([X_poly, data[control_features].reset_index(drop=True)], axis=1)
 
 # Define the target variable
 y = data["label"].astype(int)
 
-
 # Scale the features
 scaler = MinMaxScaler()
-X = pd.DataFrame(scaler.fit_transform(X), columns=X.columns)
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+X_combined = pd.DataFrame(scaler.fit_transform(X_combined), columns=X_combined.columns)
+X_train, X_test, y_train, y_test = train_test_split(X_combined, y, test_size=0.3, random_state=42)
 
 # Oversample the training data
 def oversample_training_data(X, y, random_state=42):
@@ -57,7 +57,7 @@ X_train, y_train = oversample_training_data(X_train, y_train, random_state=42)
 # Calculate sampling strategy based on initial distribution
 initial_label_counts = y.value_counts()
 sampling_strategy = {
-    label: int(initial_label_counts[label] * len(y_test) / len(y) * 0.9)  # Multiply by 0.9 to account for randomness
+    label: int(initial_label_counts[label] * len(y_test) / len(y) * 0.7)  # Multiply by 0.8 to account for randomness
     for label in initial_label_counts.index
 }
 
@@ -78,7 +78,7 @@ stacking_clf = StackingClassifier(
 )
 
 # Iterative feature dropping
-def iterative_feature_dropping(X_train, y_train, X_test, y_test, stacking_clf, iterations=5, drop_percent=0.1):
+def iterative_feature_dropping(X_train, y_train, X_test, y_test, stacking_clf, iterations=5, drop_percent=0.05):
     surviving_features = X_train.columns.tolist()
     
     for iteration in range(iterations):
@@ -100,7 +100,7 @@ def iterative_feature_dropping(X_train, y_train, X_test, y_test, stacking_clf, i
     return surviving_features
 
 # Run iterative feature dropping
-surviving_features = iterative_feature_dropping(X_train, y_train, X_test, y_test, stacking_clf, iterations=5, drop_percent=0.15)
+surviving_features = iterative_feature_dropping(X_train, y_train, X_test, y_test, stacking_clf, iterations=5, drop_percent=0.08)
 
 # Final training with surviving features
 stacking_clf.fit(X_train[surviving_features], y_train)
