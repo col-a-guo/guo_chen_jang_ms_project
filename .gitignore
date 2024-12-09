@@ -1,3 +1,4 @@
 .env
 jangmasters.code-workspace
 test_trainer
+wandb
