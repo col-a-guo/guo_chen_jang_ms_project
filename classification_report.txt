@@ -12,3 +12,13 @@ Classification Report:
     Recall (Macro): 0.5000
     F1 Score (Macro): 0.4839
     
+
+Classification Report:
+    Accuracy: 0.8853
+    Precision (Macro): 0.2951
+    Recall (Macro): 0.3333
+    F1 Score (Macro): 0.3131
+    
+Run Parameters:
+ lr: 3.401773449427116e-05, eps: 6.355053993903425e-07, batch_size: 16
+

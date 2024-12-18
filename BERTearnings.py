@@ -4,6 +4,8 @@ from transformers import AutoTokenizer, AutoModel
 from torch.utils.data import DataLoader, Dataset
 from transformers import get_scheduler
 from datasets import load_dataset
+from collections import Counter
+from imblearn.over_sampling import RandomOverSampler
 import torchmetrics
 import wandb
 import optuna
@@ -22,8 +24,8 @@ def generate_classification_report(model, dataloader, num_classes):
             input_ids, attention_mask, labels = [t.to(device) for t in batch]
             logits = model(input_ids, attention_mask)
             preds = torch.argmax(logits, dim=1)  # Multi-class prediction
-            all_preds.extend(preds.cpu().numpy())
-            all_labels.extend(labels.cpu().numpy())
+            all_preds.extend(preds.cpu())
+            all_labels.extend(labels.cpu())
 
     all_preds = torch.tensor(all_preds)
     all_labels = torch.tensor(all_labels)
@@ -47,8 +49,6 @@ Classification Report:
     # Append the report to a text file
     with open("classification_report.txt", "a") as f:
         f.write(report + "\n")
-        f.close()
-
 
 # Define the model
 class BertClassifier(nn.Module):
@@ -80,7 +80,7 @@ dataset = load_dataset('csv', data_files={'train': "train_" + ogpath, 'test': "t
 
 # Truncate dataset to the first entries
 def truncate_dataset(dataset):
-    return dataset.select(range(min(3072, len(dataset))))
+    return dataset.select(range(min(64, len(dataset))))
 
 dataset = {k: truncate_dataset(v) for k, v in dataset.items()}
 
@@ -104,18 +104,32 @@ class CustomDataset(Dataset):
         item = self.dataset[idx]
         input_ids = torch.tensor(item['input_ids'])
         attention_mask = torch.tensor(item['attention_mask'])
-        label = torch.tensor(item['label'], dtype=torch.float)
+        label = torch.tensor(item['label'], dtype=torch.long)
         return input_ids, attention_mask, label
 
 train_data = CustomDataset(train_dataset)
 test_data = CustomDataset(test_dataset)
 
+# Oversampling to balance labels
+train_labels = [item['label'] for item in train_dataset]
+label_counts = Counter(train_labels)
+print("Original label distribution:", label_counts)
+
+sampler = RandomOverSampler()
+train_indices = list(range(len(train_labels)))
+resampled_indices, resampled_labels = sampler.fit_resample(torch.tensor(train_indices).view(-1, 1), torch.tensor(train_labels))
+resampled_indices = resampled_indices.flatten().tolist()
+
+resampled_train_data = torch.utils.data.Subset(train_data, resampled_indices)
+resampled_label_counts = Counter(resampled_labels)
+print("Resampled label distribution:", resampled_label_counts)
+
 # DataLoader
 batch_size = 16
-train_dataloader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
+train_dataloader = DataLoader(resampled_train_data, batch_size=batch_size, shuffle=True)
 test_dataloader = DataLoader(test_data, batch_size=batch_size)
 
-# Training functionp
+# Training function
 def train_and_evaluate(model, train_dataloader, val_dataloader, optimizer, scheduler, epochs, patience=3):
     model.to(device)
     mse_loss_fn = nn.MSELoss()
@@ -129,7 +143,7 @@ def train_and_evaluate(model, train_dataloader, val_dataloader, optimizer, sched
             input_ids, attention_mask, labels = [t.to(device) for t in batch]
             model.zero_grad()
             logits = model(input_ids, attention_mask)
-            loss = mse_loss_fn(logits.view(-1), labels)
+            loss = mse_loss_fn(logits.view(-1), labels.float())
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             optimizer.step()
@@ -145,7 +159,7 @@ def train_and_evaluate(model, train_dataloader, val_dataloader, optimizer, sched
             for batch in val_dataloader:
                 input_ids, attention_mask, labels = [t.to(device) for t in batch]
                 logits = model(input_ids, attention_mask)
-                val_loss += mse_loss_fn(logits.view(-1), labels).item()
+                val_loss += mse_loss_fn(logits.view(-1), labels.float()).item()
 
         avg_val_loss = val_loss / len(val_dataloader)
         print(f"Epoch {epoch + 1}/{epochs}, Training Loss: {avg_train_loss:.4f}, Validation Loss: {avg_val_loss:.4f}")
@@ -158,9 +172,6 @@ def train_and_evaluate(model, train_dataloader, val_dataloader, optimizer, sched
             patience_counter += 1
             if patience_counter >= patience:
                 print("Early stopping triggered.")
-                
-
-                generate_classification_report(model, val_dataloader, num_classes=3)
                 break
 
     return best_loss
@@ -171,7 +182,7 @@ def objective(trial):
     eps = trial.suggest_loguniform("eps", 1e-8, 1e-6)
     batch_size = trial.suggest_categorical("batch_size", [16, 32])
 
-    train_dataloader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
+    train_dataloader = DataLoader(resampled_train_data, batch_size=batch_size, shuffle=True)
     test_dataloader = DataLoader(test_data, batch_size=batch_size)
 
     model = BertClassifier()
@@ -182,14 +193,12 @@ def objective(trial):
     val_loss = train_and_evaluate(model, train_dataloader, test_dataloader, optimizer, scheduler, epochs=10)
     with open("classification_report.txt", "a") as f:
         f.write(f"Run Parameters:\n lr: {lr}, eps: {eps}, batch_size: {batch_size}\n\n")
-        f.close()
     return val_loss
 
 study = optuna.create_study(direction="minimize")
 study.optimize(objective, n_trials=10)
 
 print("Best hyperparameters:", study.best_params)
-
 
 # Final evaluation
 model = BertClassifier(num_labels=3).to(device)  # Update num_labels to match your dataset
