@@ -1,0 +1,14 @@
+
+Classification Report:
+    Accuracy: 0.9375
+    Precision (Macro): 0.4688
+    Recall (Macro): 0.5000
+    F1 Score (Macro): 0.4839
+    
+
+Classification Report:
+    Accuracy: 0.9375
+    Precision (Macro): 0.4688
+    Recall (Macro): 0.5000
+    F1 Score (Macro): 0.4839
+    

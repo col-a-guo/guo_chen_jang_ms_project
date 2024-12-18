@@ -1,34 +1,64 @@
 import torch
 import torch.nn as nn
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from transformers import AutoTokenizer, AutoModel
 from torch.utils.data import DataLoader, Dataset
-from transformers import AdamW, get_scheduler
+from transformers import get_scheduler
 from datasets import load_dataset
+import torchmetrics
 import wandb
-import time
-import os
+import optuna
 
-# Initialize WandB
-wandb.init(project="bert-hyperparameter-search", entity="collinguo-sacramento-state")
+# Detect GPU
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"Using device: {device}")
 
-os.environ['WANDB_TIMEOUT'] = '60' # set timeout to 60 seconds
-# Default mode
-default_mode = 'multiclass'
+# Generate classification report for multi-class
+def generate_classification_report(model, dataloader, num_classes):
+    model.eval()
+    all_preds = []
+    all_labels = []
+    with torch.no_grad():
+        for batch in dataloader:
+            input_ids, attention_mask, labels = [t.to(device) for t in batch]
+            logits = model(input_ids, attention_mask)
+            preds = torch.argmax(logits, dim=1)  # Multi-class prediction
+            all_preds.extend(preds.cpu().numpy())
+            all_labels.extend(labels.cpu().numpy())
 
+    all_preds = torch.tensor(all_preds)
+    all_labels = torch.tensor(all_labels)
+
+    # Update metrics to include task
+    accuracy = torchmetrics.Accuracy(task='multiclass', num_classes=num_classes)(all_preds, all_labels)
+    precision = torchmetrics.Precision(task='multiclass', num_classes=num_classes, average='macro')(all_preds, all_labels)
+    recall = torchmetrics.Recall(task='multiclass', num_classes=num_classes, average='macro')(all_preds, all_labels)
+    f1 = torchmetrics.F1Score(task='multiclass', num_classes=num_classes, average='macro')(all_preds, all_labels)
+
+    report = f"""
+Classification Report:
+    Accuracy: {accuracy:.4f}
+    Precision (Macro): {precision:.4f}
+    Recall (Macro): {recall:.4f}
+    F1 Score (Macro): {f1:.4f}
+    """
+
+    print(report)
+
+    # Append the report to a text file
+    with open("classification_report.txt", "a") as f:
+        f.write(report + "\n")
+        f.close()
+
+
+# Define the model
 class BertClassifier(nn.Module):
-    def __init__(self, mode=default_mode, freeze_bert=False):
+    def __init__(self, num_labels=1, freeze_bert=False):
         super(BertClassifier, self).__init__()
-        D_in, H = 768, 50
-        self.mode = mode
-        num_classes = 1 if mode == 'regression' else 3
-
-        self.bert = AutoModelForSequenceClassification.from_pretrained('pborchert/BusinessBERT', num_labels=num_classes)
-
-        self.multi_label_classifier = nn.Sequential(
-            nn.Linear(D_in, H),
+        self.bert = AutoModel.from_pretrained('bert-base-uncased')
+        self.cls_head = nn.Sequential(
+            nn.Linear(self.bert.config.hidden_size, 128),
             nn.ReLU(),
-            nn.Linear(H, 10),
-            nn.Sigmoid()
+            nn.Linear(128, num_labels)
         )
 
         if freeze_bert:
@@ -36,30 +66,33 @@ class BertClassifier(nn.Module):
                 param.requires_grad = False
 
     def forward(self, input_ids, attention_mask):
-        outputs = self.bert(input_ids=input_ids, attention_mask=attention_mask, output_hidden_states=True)
-        hidden_states = outputs.hidden_states
-        last_hidden_state = hidden_states[-1]
-        cls_token_embedding = last_hidden_state[:, 0, :]
+        outputs = self.bert(input_ids=input_ids, attention_mask=attention_mask)
+        cls_output = outputs.last_hidden_state[:, 0, :]  # [CLS] token representation
+        logits = self.cls_head(cls_output)
+        return logits
 
-        if self.mode == 'regression':
-            return outputs.logits, self.multi_label_classifier(cls_token_embedding)
-        elif self.mode == 'multiclass':
-            return outputs.logits, self.multi_label_classifier(cls_token_embedding)
+# Load tokenizer
+tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
 
-# Load the tokenizer
-tokenizer = AutoTokenizer.from_pretrained("pborchert/BusinessBERT")
-
-# Load and preprocess the dataset
+# Load dataset and preprocess
 ogpath = "combined.csv"
 dataset = load_dataset('csv', data_files={'train': "train_" + ogpath, 'test': "test_" + ogpath})
 
+# Truncate dataset to the first entries
+def truncate_dataset(dataset):
+    return dataset.select(range(min(3072, len(dataset))))
+
+dataset = {k: truncate_dataset(v) for k, v in dataset.items()}
+
+# Tokenize dataset
 def tokenize_function(examples):
     return tokenizer(examples["paragraph"], padding="max_length", truncation=True, max_length=512)
 
-tokenized_datasets = dataset.map(tokenize_function, batched=True)
+tokenized_datasets = {split: data.map(tokenize_function, batched=True) for split, data in dataset.items()}
 train_dataset = tokenized_datasets["train"]
 test_dataset = tokenized_datasets["test"]
 
+# Custom dataset
 class CustomDataset(Dataset):
     def __init__(self, dataset):
         self.dataset = dataset
@@ -71,90 +104,96 @@ class CustomDataset(Dataset):
         item = self.dataset[idx]
         input_ids = torch.tensor(item['input_ids'])
         attention_mask = torch.tensor(item['attention_mask'])
-        regression_label = torch.tensor(item['label'], dtype=torch.float)
-        multi_labels = torch.tensor([
-            item["scarcity"], item["nonuniform_progress"], item["performance_constraints"],
-            item["user_heterogeneity"], item["cognitive"], item["external"], 
-            item["internal"], item["coordination"], item["technical"], item["demand"]
-        ], dtype=torch.float)
-        return input_ids, attention_mask, regression_label, multi_labels
+        label = torch.tensor(item['label'], dtype=torch.float)
+        return input_ids, attention_mask, label
 
 train_data = CustomDataset(train_dataset)
 test_data = CustomDataset(test_dataset)
 
-train_dataloader = DataLoader(train_data, batch_size=16, shuffle=True)
-test_dataloader = DataLoader(test_data, batch_size=16)
+# DataLoader
+batch_size = 16
+train_dataloader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
+test_dataloader = DataLoader(test_data, batch_size=batch_size)
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-def train(model, train_dataloader, config, val_dataloader=None, epochs=3):
-    optimizer = AdamW(model.parameters(), lr=config["lr"], eps=config["eps"])
-    total_steps = len(train_dataloader) * epochs
-    scheduler = get_scheduler("linear", optimizer=optimizer, num_warmup_steps=0, num_training_steps=total_steps)
+# Training functionp
+def train_and_evaluate(model, train_dataloader, val_dataloader, optimizer, scheduler, epochs, patience=3):
+    model.to(device)
     mse_loss_fn = nn.MSELoss()
-    cross_entropy_loss_fn = nn.CrossEntropyLoss()
-    multi_label_loss_fn = nn.BCEWithLogitsLoss()
+    best_loss = float('inf')
+    patience_counter = 0
 
     for epoch in range(epochs):
         model.train()
         total_loss = 0
-        for step, batch in enumerate(train_dataloader):
-            b_input_ids, b_attn_mask, b_regression_labels, b_multi_labels = [t.to(device) for t in batch]
+        for batch in train_dataloader:
+            input_ids, attention_mask, labels = [t.to(device) for t in batch]
             model.zero_grad()
-            regression_logits, multi_label_logits = model(b_input_ids, b_attn_mask)
-            multi_label_loss = multi_label_loss_fn(multi_label_logits, b_multi_labels)
-            variable_loss = mse_loss_fn(regression_logits.view(-1, 1), b_regression_labels)
-            loss = variable_loss + multi_label_loss
-            total_loss += loss.item()
+            logits = model(input_ids, attention_mask)
+            loss = mse_loss_fn(logits.view(-1), labels)
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             optimizer.step()
             scheduler.step()
-
-        avg_loss = total_loss / len(train_dataloader)
-        wandb.log({"train_loss": avg_loss, "epoch": epoch + 1})
-
-def evaluate(model, val_dataloader):
-    model.eval()
-    total_loss = 0
-    mse_loss_fn = nn.MSELoss()
-    multi_label_loss_fn = nn.BCEWithLogitsLoss()
-
-    with torch.no_grad():
-        for batch in val_dataloader:
-            b_input_ids, b_attn_mask, b_regression_labels, b_multi_labels = [t.to(device) for t in batch]
-            regression_logits, multi_label_logits = model(b_input_ids, b_attn_mask)
-            multi_label_loss = multi_label_loss_fn(multi_label_logits, b_multi_labels)
-            variable_loss = mse_loss_fn(regression_logits.view(-1, 1), b_regression_labels)
-            loss = variable_loss + multi_label_loss
             total_loss += loss.item()
 
-    avg_loss = total_loss / len(val_dataloader)
-    wandb.log({"val_loss": avg_loss})
-    print(f"Validation Loss: {avg_loss:.4f}")
+        avg_train_loss = total_loss / len(train_dataloader)
 
-# Define a WandB sweep configuration
-sweep_config = {
-    "method": "grid",
-    "metric": {"name": "val_loss", "goal": "minimize"},
-    "parameters": {
-        "lr": {"values": [1e-5, 3e-5, 5e-5]},
-        "eps": {"values": [1e-6, 1e-8, 1e-10]},
-        "batch_size": {"values": [16, 32]}
-    },
-}
+        # Validation
+        model.eval()
+        val_loss = 0
+        with torch.no_grad():
+            for batch in val_dataloader:
+                input_ids, attention_mask, labels = [t.to(device) for t in batch]
+                logits = model(input_ids, attention_mask)
+                val_loss += mse_loss_fn(logits.view(-1), labels).item()
 
-sweep_id = wandb.sweep(sweep_config, project="bert-hyperparameter-search")
+        avg_val_loss = val_loss / len(val_dataloader)
+        print(f"Epoch {epoch + 1}/{epochs}, Training Loss: {avg_train_loss:.4f}, Validation Loss: {avg_val_loss:.4f}")
 
-# Sweep function
-def sweep_train():
-    config = wandb.config
-    # Ensure default values for 'lr' and 'eps'
-    lr = config.get("lr", 3e-5)  # Default value
-    eps = config.get("eps", 1e-8)  # Default value
-    
-    model = BertClassifier(mode=default_mode, freeze_bert=False).to(device)
-    train(model, train_dataloader, {"lr": lr, "eps": eps}, val_dataloader=test_dataloader, epochs=3)
+        # Early stopping
+        if avg_val_loss < best_loss:
+            best_loss = avg_val_loss
+            patience_counter = 0
+        else:
+            patience_counter += 1
+            if patience_counter >= patience:
+                print("Early stopping triggered.")
+                
+
+                generate_classification_report(model, val_dataloader, num_classes=3)
+                break
+
+    return best_loss
+
+# Optuna hyperparameter optimization
+def objective(trial):
+    lr = trial.suggest_loguniform("lr", 1e-6, 1e-4)
+    eps = trial.suggest_loguniform("eps", 1e-8, 1e-6)
+    batch_size = trial.suggest_categorical("batch_size", [16, 32])
+
+    train_dataloader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
+    test_dataloader = DataLoader(test_data, batch_size=batch_size)
+
+    model = BertClassifier()
+    optimizer = torch.optim.AdamW(model.parameters(), lr=lr, eps=eps)
+    total_steps = len(train_dataloader) * 10  # Higher default epochs
+    scheduler = get_scheduler("linear", optimizer=optimizer, num_warmup_steps=0, num_training_steps=total_steps)
+
+    val_loss = train_and_evaluate(model, train_dataloader, test_dataloader, optimizer, scheduler, epochs=10)
+    with open("classification_report.txt", "a") as f:
+        f.write(f"Run Parameters:\n lr: {lr}, eps: {eps}, batch_size: {batch_size}\n\n")
+        f.close()
+    return val_loss
+
+study = optuna.create_study(direction="minimize")
+study.optimize(objective, n_trials=10)
+
+print("Best hyperparameters:", study.best_params)
 
 
-wandb.agent(sweep_id, function=sweep_train)
+# Final evaluation
+model = BertClassifier(num_labels=3).to(device)  # Update num_labels to match your dataset
+optimizer = torch.optim.AdamW(model.parameters(), lr=study.best_params['lr'], eps=study.best_params['eps'])
+scheduler = get_scheduler("linear", optimizer=optimizer, num_warmup_steps=0, num_training_steps=len(train_dataloader) * 10)
+train_and_evaluate(model, train_dataloader, test_dataloader, optimizer, scheduler, epochs=10)
+generate_classification_report(model, test_dataloader, num_classes=3)  # Update num_classes to match dataset
