@@ -1,20 +1,15 @@
 import torch
 import torch.nn as nn
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from transformers import AutoTokenizer, AutoModel
 from torch.utils.data import DataLoader, Dataset
-from transformers import AdamW, get_scheduler
+from transformers import get_scheduler
 from datasets import load_dataset
 from sklearn.metrics import classification_report
 import time
 
 default_mode = 'multiclass'  # Updated default mode to multiclass
 class BertClassifier(nn.Module):
-    """Bert Model for Regression, Multi-class and Multi-label Tasks."""
-    def __init__(self, mode=default_mode, freeze_bert=False):
-        """
-        @param mode (str): 'regression' or 'multiclass'. Determines whether to run regression or multi-class classification.
-        @param freeze_bert (bool): Set False to fine-tune the BERT model.
-        """
+    def __init__(self, num_labels=1, freeze_bert=False):
         super(BertClassifier, self).__init__()
         D_in, H = 768, 50  # BERT hidden size is 768
         self.mode = mode  # 'regression' or 'multiclass'
@@ -28,8 +23,7 @@ class BertClassifier(nn.Module):
         self.multi_label_classifier = nn.Sequential(
             nn.Linear(D_in, H),
             nn.ReLU(),
-            nn.Linear(H, 10),  # Adjust number of output labels as necessary
-            nn.Sigmoid()
+            nn.Linear(128, num_labels)
         )
 
 
@@ -75,7 +69,7 @@ tokenized_datasets = dataset.map(tokenize_function, batched=True)
 train_dataset = tokenized_datasets["train"]
 test_dataset = tokenized_datasets["test"]
 
-# Custom dataset class
+# Custom dataset
 class CustomDataset(Dataset):
     def __init__(self, dataset):
         self.dataset = dataset
@@ -183,8 +177,6 @@ def train(model, train_dataloader, val_dataloader, epochs=4, patience=3):
 
              # Perform a backward pass
             loss.backward()
-
-            # Clip the norm of the gradients to 1.0 to prevent "exploding gradients"
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
            # Update parameters and learning rate
             optimizer.step()
