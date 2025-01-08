@@ -1,24 +1,60 @@
 
 Classification Report:
-    Accuracy: 0.9375
-    Precision (Macro): 0.4688
-    Recall (Macro): 0.5000
-    F1 Score (Macro): 0.4839
-    
-
-Classification Report:
-    Accuracy: 0.9375
-    Precision (Macro): 0.4688
-    Recall (Macro): 0.5000
-    F1 Score (Macro): 0.4839
-    
-
-Classification Report:
-    Accuracy: 0.8853
-    Precision (Macro): 0.2951
-    Recall (Macro): 0.3333
-    F1 Score (Macro): 0.3131
+    Accuracy: 0.8860
+    Precision (Macro): 0.6291
+    Recall (Macro): 0.4942
+    F1 Score (Macro): 0.5353
     
 Run Parameters:
- lr: 3.401773449427116e-05, eps: 6.355053993903425e-07, batch_size: 16
+ lr: 5.6772468636402536e-05, eps: 3.9853600370802195e-07, batch_size: 16
+
+
+Classification Report:
+    Accuracy: 0.8548
+    Precision (Macro): 0.5724
+    Recall (Macro): 0.4977
+    F1 Score (Macro): 0.5146
+    
+Run Parameters:
+ lr: 2.2967644282913382e-05, eps: 9.847300056702576e-08, batch_size: 32
+
+
+Classification Report:
+    Accuracy: 0.8667
+    Precision (Macro): 0.5867
+    Recall (Macro): 0.4946
+    F1 Score (Macro): 0.5204
+    
+Run Parameters:
+ lr: 3.112164050882761e-05, eps: 2.2216871302852767e-08, batch_size: 32
+
+
+Classification Report:
+    Accuracy: 0.8720
+    Precision (Macro): 0.5751
+    Recall (Macro): 0.4890
+    F1 Score (Macro): 0.5177
+    
+Run Parameters:
+ lr: 8.93753330377752e-05, eps: 1.3632258369239643e-07, batch_size: 16
+
+
+Classification Report:
+    Accuracy: 0.8849
+    Precision (Macro): 0.6262
+    Recall (Macro): 0.5014
+    F1 Score (Macro): 0.5398
+    
+Run Parameters:
+ lr: 3.5947675893965125e-05, eps: 5.013498909011261e-07, batch_size: 16
+
+
+Classification Report:
+    Accuracy: 0.8817
+    Precision (Macro): 0.6186
+    Recall (Macro): 0.5079
+    F1 Score (Macro): 0.5415
+    
+Run Parameters:
+ lr: 5.841204543279205e-05, eps: 6.748313060587885e-08, batch_size: 32
 
