@@ -1,81 +1,165 @@
 import torch
 import torch.nn as nn
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from transformers import AutoTokenizer, AutoModel
 from torch.utils.data import DataLoader, Dataset
-from transformers import AdamW, get_scheduler
+from transformers import get_scheduler
 from datasets import load_dataset
-from sklearn.metrics import classification_report
-import time
+from collections import Counter
+from imblearn.over_sampling import RandomOverSampler
+import torchmetrics
+import optuna
+from sklearn.metrics import confusion_matrix
+import random
+import numpy as np
 
-default_mode = 'multiclass'  # Updated default mode to multiclass
+# Set the seed early
+seed_value = 42
+random.seed(seed_value)
+np.random.seed(seed_value)
+torch.manual_seed(seed_value)
+torch.cuda.manual_seed_all(seed_value)  # If using CUDA
+
+# Detect GPU
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"Using device: {device}")
+
+# Define the versions
+version_list = ["bert-uncased", "bert-uncased-pooling", "businessBERT"]
+
+# Default hyperparameters for Optuna
+default_lr = 5.841204543279205e-05
+default_eps = 6.748313060587885e-08
+default_batch_size = 32
+
+# Function to generate classification report for multi-class
+def generate_classification_report(model, dataloader, num_classes, epoch=None, version=None):
+    model.eval()
+    all_preds = []
+    all_labels = []
+    with torch.no_grad():
+        for batch in dataloader:
+            input_ids, attention_mask, labels = [t.to(device) for t in batch]
+            logits = model(input_ids, attention_mask)
+            preds = torch.argmax(logits, dim=1)  # Multi-class prediction
+            all_preds.extend(preds.cpu())
+            all_labels.extend(labels.cpu())
+
+    all_preds = torch.tensor(all_preds)
+    all_labels = torch.tensor(all_labels)
+
+    # Update metrics to include task
+    accuracy = torchmetrics.Accuracy(task='multiclass', num_classes=num_classes)(all_preds, all_labels)
+    precision = torchmetrics.Precision(task='multiclass', num_classes=num_classes, average='macro')(all_preds, all_labels)
+    recall = torchmetrics.Recall(task='multiclass', num_classes=num_classes, average='macro')(all_preds, all_labels)
+    f1 = torchmetrics.F1Score(task='multiclass', num_classes=num_classes, average='macro')(all_preds, all_labels)
+
+    report = f"""
+Classification Report (Version: {version}, Epoch {epoch if epoch is not None else 'Final'}):
+    Accuracy: {accuracy:.4f}
+    Precision (Macro): {precision:.4f}
+    Recall (Macro): {recall:.4f}
+    F1 Score (Macro): {f1:.4f}
+    """
+
+    # Calculate confusion matrix
+    cm = confusion_matrix(all_labels.numpy(), all_preds.numpy(), labels=list(range(num_classes)))
+    
+    report += "\nConfusion Matrix:\n"
+    report += "            Predicted\n"
+    report += "           " + "    ".join(map(str, range(num_classes))) + "\n"
+    report += "Actual\n"
+    for i, row in enumerate(cm):
+        report += f"      {i}   " + "    ".join(map(str, row)) + "\n"
+    
+    # Calculate and add TP, FP, TN, FN per class
+    report += "\nPer-Class Metrics:\n"
+    for i in range(num_classes):
+        tp = cm[i, i]
+        fp = cm[:, i].sum() - tp
+        fn = cm[i, :].sum() - tp
+        tn = cm.sum() - tp - fp - fn
+        report += f"  Class {i}: TP={tp}, FP={fp}, TN={tn}, FN={fn}\n"
+
+    print(report)
+
+    # Append the report to a text file
+    with open("classification_report.txt", "a") as f:
+        f.write(report + "\n")
+
+    return f1 # Return F1 score
+
+# Define the model architecture based on version
 class BertClassifier(nn.Module):
-    """Bert Model for Regression, Multi-class and Multi-label Tasks."""
-    def __init__(self, mode=default_mode, freeze_bert=False):
-        """
-        @param mode (str): 'regression' or 'multiclass'. Determines whether to run regression or multi-class classification.
-        @param freeze_bert (bool): Set False to fine-tune the BERT model.
-        """
+    def __init__(self, version, num_labels=1, freeze_bert=False):
         super(BertClassifier, self).__init__()
-        D_in, H = 768, 50  # BERT hidden size is 768
-        self.mode = mode  # 'regression' or 'multiclass'
-        num_classes = 1 if mode == 'regression' else 3  # Default: regression, else multiclass (change as needed)
 
-        # Load the BusinessBERT model
-        self.bert = AutoModelForSequenceClassification.from_pretrained('pborchert/BusinessBERT', num_labels=num_classes, problem_type = "single_label_classification")
+        if version == "bert-uncased" or version == "bert-uncased-pooling":
+            self.bert = AutoModel.from_pretrained('google-bert/bert-base-uncased')
+        elif version == "businessBERT":
+            self.bert = AutoModel.from_pretrained('pborchert/BusinessBERT')
+        else:
+           raise ValueError(f"Invalid model version: {version}")
+        
+        self.version = version  # Store the version
+        
+        if self.version == "bert-uncased-pooling":
+            self.cls_head = nn.Sequential(
+                nn.Linear(self.bert.config.hidden_size, 128),
+                nn.ReLU(),
+                nn.Linear(128, num_labels)
+            )
+            self.pooling = nn.AdaptiveAvgPool1d(1) # Global average pooling layer
 
+        else:
+            self.cls_head = nn.Sequential(
+                nn.Linear(self.bert.config.hidden_size, 128),
+                nn.ReLU(),
+                nn.Linear(128, num_labels)
+            )
 
-        # Define the multi-label classification head (adjust for your number of labels)
-        self.multi_label_classifier = nn.Sequential(
-            nn.Linear(D_in, H),
-            nn.ReLU(),
-            nn.Linear(H, 10),  # Adjust number of output labels as necessary
-            nn.Sigmoid()
-        )
-
-
-        # Optionally freeze the BERT model layers
         if freeze_bert:
             for param in self.bert.parameters():
                 param.requires_grad = False
 
     def forward(self, input_ids, attention_mask):
-         # Pass through BERT
-        outputs = self.bert(input_ids=input_ids, attention_mask=attention_mask, output_hidden_states=True)
+            outputs = self.bert(input_ids=input_ids, attention_mask=attention_mask)
 
-        # Extract the hidden states (last hidden state from BERT)
-        hidden_states = outputs.hidden_states  # This is a tuple of (layer_0, layer_1, ..., layer_N)
-        last_hidden_state = hidden_states[-1]  # The last layer's hidden state
-        cls_token_embedding = last_hidden_state[:, 0, :]  # Extract the [CLS] token's embedding
+            if self.version == "bert-uncased-pooling":
+                # Global average pooling
+                last_hidden_state = outputs.last_hidden_state
+                pooled_output = self.pooling(last_hidden_state.permute(0, 2, 1)).squeeze(-1)
+                logits = self.cls_head(pooled_output)
+            else:
+                cls_output = outputs.last_hidden_state[:, 0, :]  # [CLS] token representation
+                logits = self.cls_head(cls_output)
+            return logits
 
-        # Multi-class classification logits (using the logits directly from BERT)
-        if self.mode == 'regression':
-           regression_logits = outputs.logits
-           return regression_logits, self.multi_label_classifier(cls_token_embedding)
-    
-        elif self.mode == 'multiclass':
-           multiclass_logits = outputs.logits
-           return multiclass_logits, self.multi_label_classifier(cls_token_embedding)
+# Function to load the correct tokenizer
+def load_tokenizer(version):
+    if version == "bert-uncased" or version == "bert-uncased-pooling":
+        return AutoTokenizer.from_pretrained('google-bert/bert-base-uncased')
+    elif version == "businessBERT":
+        return AutoTokenizer.from_pretrained('pborchert/BusinessBERT')
+    else:
+        raise ValueError(f"Invalid model version: {version}")
 
-
-
-
-# Load the tokenizer
-tokenizer = AutoTokenizer.from_pretrained("pborchert/BusinessBERT")
-
-# Load and preprocess the dataset
+# Load dataset and preprocess
 ogpath = "combined.csv"
 dataset = load_dataset('csv', data_files={'train': "train_" + ogpath, 'test': "test_" + ogpath})
 
+# Truncate dataset to the first entries
+def truncate_dataset(dataset):
+    k = round(len(dataset)*0.08)
+    random_indices = random.sample(range(len(dataset)), k)
+    return dataset.select(random_indices)
 
-def tokenize_function(examples):
+dataset = {k: truncate_dataset(v) for k, v in dataset.items()}
+
+# Tokenize dataset
+def tokenize_function(examples, tokenizer):
     return tokenizer(examples["paragraph"], padding="max_length", truncation=True, max_length=512)
 
-
-tokenized_datasets = dataset.map(tokenize_function, batched=True)
-train_dataset = tokenized_datasets["train"]
-test_dataset = tokenized_datasets["test"]
-
-# Custom dataset class
+# Custom dataset
 class CustomDataset(Dataset):
     def __init__(self, dataset):
         self.dataset = dataset
@@ -84,187 +168,125 @@ class CustomDataset(Dataset):
         return len(self.dataset)
 
     def __getitem__(self, idx):
-         item = self.dataset[idx]
+        item = self.dataset[idx]
+        input_ids = torch.tensor(item['input_ids'])
+        attention_mask = torch.tensor(item['attention_mask'])
+        label = torch.tensor(item['label'], dtype=torch.long)
+        return input_ids, attention_mask, label
 
-        # Tokenized inputs
-         input_ids = torch.tensor(item['input_ids'])
-         attention_mask = torch.tensor(item['attention_mask'])
-         # Multi-class label
-         regression_label = torch.tensor(item['label'], dtype=torch.float)  # Regression label (continuous)
-         multiclass_label = torch.tensor(item['label'], dtype=torch.long)  # CrossEntropy needs int or long labels (change from before, for multiclass instead of onehot or category)
-         # Multi-label features
-         multi_labels = torch.tensor([
-            item["scarcity"],
-             item["nonuniform_progress"],
-            item["performance_constraints"],
-           item["user_heterogeneity"],
-             item["cognitive"],
-            item["external"],
-           item["internal"],
-              item["coordination"],
-            item["technical"],
-             item["demand"]
-       ], dtype=torch.float)  # Shape: [10]
-
-
-         return input_ids, attention_mask, regression_label, multiclass_label, multi_labels
-
-train_data = CustomDataset(train_dataset)
-test_data = CustomDataset(test_dataset)
-
-train_dataloader = DataLoader(train_data, batch_size=16, shuffle=True)
-test_dataloader = DataLoader(test_data, batch_size=16)
-
-# Initialize model, optimizer, and scheduler
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print(f"Using device: {device}")
-model = BertClassifier(mode=default_mode, freeze_bert=False).to(device)
-optimizer = AdamW(model.parameters(), lr=3e-5, eps=1e-8)
-num_epochs = 10 #Setting max epoch size to 10 now
-total_steps = len(train_dataloader) * num_epochs
-scheduler = get_scheduler("linear", optimizer=optimizer, num_warmup_steps=0, num_training_steps=total_steps)
-
-# Global mode variable (toggle between regression and multiclass)
-default_mode = 'multiclass'  # Change mode here if wanted.
-
-# Define loss functions
-mse_loss_fn = nn.MSELoss()  # MSE for regression
-cross_entropy_loss_fn = nn.CrossEntropyLoss()  # CrossEntropy for multiclass classification
-multi_label_loss_fn = nn.BCEWithLogitsLoss()  # Multi-label Binary Cross Entropy Loss with Logits
-
-# Variable loss function that switches between regression and multiclass
-def variable_loss_fn(logits, labels):
-    if default_mode == 'regression':
-        return mse_loss_fn(logits.view(-1, 1), labels)  # For regression, MSE loss
-    elif default_mode == 'multiclass':
-         return cross_entropy_loss_fn(logits.view(-1, 3), labels) # For multiclass, CrossEntropy loss
-    else:
-         raise ValueError(f"Unsupported mode: {default_mode}")
-
-
-# Training loop with early stopping and classification reports
-def train(model, train_dataloader, val_dataloader, epochs=4, patience=3):
-    print("Starting training...\n")
-
-    best_loss = float('inf')  # best loss that it must match or surpass, based on a "lower than" comparison.
+# Training function
+def train_and_evaluate(model, train_dataloader, val_dataloader, optimizer, scheduler, epochs, loss_fn, patience=3, num_classes=3, version=None):
+    model.to(device)
+    best_f1 = 0.0  # Initialize best f1 score
     patience_counter = 0
 
     for epoch in range(epochs):
-        print(f"Epoch {epoch+1}/{epochs}")
-        print(f"{'Batch':<8}{'Variable Loss':<12}{'Multilabel Loss':<18}{'Avg Loss':<12}{'Elapsed':<9}")
-        print("-" * 60)
-
         model.train()
-        t0_epoch = time.time()
         total_loss = 0
-        total_variable_loss = 0
-        total_multi_label_loss = 0
-
-        for step, batch in enumerate(train_dataloader):
-             # Load batch to GPU
-            b_input_ids, b_attn_mask, b_regression_labels, b_multiclass_labels, b_multi_labels = tuple(t.to(device) for t in batch)
-            # Zero out any previously calculated gradients
+        for batch in train_dataloader:
+            input_ids, attention_mask, labels = [t.to(device) for t in batch]
             model.zero_grad()
-           # Perform a forward pass
-            multiclass_logits, multi_label_logits = model(b_input_ids, b_attn_mask)
-             # Compute multi-label loss first (this will always be used)
-            multi_label_loss = multi_label_loss_fn(multi_label_logits, b_multi_labels)
-
-
-             # Use variable_loss_fn to calculate either regression or multiclass loss
-            variable_loss = variable_loss_fn(multiclass_logits, b_multiclass_labels) if default_mode == 'multiclass' else variable_loss_fn(multiclass_logits.view(-1,1), b_regression_labels)
-            # Total loss is the sum of variable loss and multi-label loss
-            loss = variable_loss + multi_label_loss
-            # Accumulate total losses for this batch
-            total_loss += loss.item()
-            total_variable_loss += variable_loss.item()
-            total_multi_label_loss += multi_label_loss.item()
-
-
-             # Perform a backward pass
+            logits = model(input_ids, attention_mask)
+            loss = loss_fn(logits, labels) #  Calculate loss using weighted CrossEntropyLoss
             loss.backward()
-
-            # Clip the norm of the gradients to 1.0 to prevent "exploding gradients"
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-           # Update parameters and learning rate
             optimizer.step()
             scheduler.step()
-            if step % 10 == 0:
-                elapsed = time.time() - t0_epoch
-                print(f"{step:<8}{variable_loss.item():<12.6f}{multi_label_loss.item():<18.6f}{loss.item():<12.6f}{elapsed:<9.2f}")
+            total_loss += loss.item()
 
-       # Average loss for this epoch
-        avg_loss = total_loss / len(train_dataloader)
-        avg_variable_loss = total_variable_loss / len(train_dataloader)
-        avg_multi_label_loss = total_multi_label_loss / len(train_dataloader)
+        avg_train_loss = total_loss / len(train_dataloader)
 
-        print(f"\nEpoch {epoch+1} - Average losses:")
-        print(f"Variable Loss: {avg_variable_loss:.6f}")
-        print(f"Multilabel Loss: {avg_multi_label_loss:.6f}")
-        print(f"Avg Loss: {avg_loss:.6f}")
+        # Validation
+        model.eval()
+        val_loss = 0
+        with torch.no_grad():
+            for batch in val_dataloader:
+                input_ids, attention_mask, labels = [t.to(device) for t in batch]
+                logits = model(input_ids, attention_mask)
+                val_loss += loss_fn(logits, labels).item() # Calculate validation loss using weighted CrossEntropyLoss
 
+        avg_val_loss = val_loss / len(val_dataloader)
+        print(f"Epoch {epoch + 1}/{epochs}, Training Loss: {avg_train_loss:.4f}, Validation Loss: {avg_val_loss:.4f}")
+        
+        # Generate and save the classification report every epoch
+        f1_score = generate_classification_report(model, val_dataloader, num_classes, epoch=epoch+1, version=version)
 
-
-         # Evaluate on validation data and perform early stopping check (and also prints the report to screen)
-        val_loss = evaluate(model, val_dataloader)
-        if val_loss < best_loss:
-                best_loss = val_loss
-                patience_counter = 0
+        # Early stopping based on F1 score
+        if f1_score > best_f1:
+            best_f1 = f1_score
+            patience_counter = 0
         else:
             patience_counter += 1
-        if patience_counter >= patience:
-            print(f"Early stopping triggered!  Best loss {best_loss} at epoch {epoch - patience +1 }.")
-            break
+            if patience_counter >= patience:
+                print("Early stopping triggered.")
+                break
 
-    return model
+    return best_f1 # return the best f1 score
 
-# Evaluation function (similar logic as training, dynamic loss computation)
-def evaluate(model, val_dataloader):
-     model.eval()
-     total_loss = 0
-     total_variable_loss = 0
-     total_multi_label_loss = 0
-     all_labels = []
-     all_preds = []
-
-     with torch.no_grad():
-         for batch in val_dataloader:
-             b_input_ids, b_attn_mask, b_regression_labels, b_multiclass_labels, b_multi_labels = [t.to(device) for t in batch]
-
-            # Perform forward pass
-             multiclass_logits, multi_label_logits = model(b_input_ids, b_attn_mask)
-               # Compute multi-label loss first (this will always be used)
-             multi_label_loss = multi_label_loss_fn(multi_label_logits, b_multi_labels)
-
-            # Use variable_loss_fn to calculate either regression or multiclass loss
-             variable_loss = variable_loss_fn(multiclass_logits, b_multiclass_labels) if default_mode == 'multiclass' else variable_loss_fn(multiclass_logits.view(-1,1), b_regression_labels)
-
-            # Total loss is the sum of variable loss and multi-label loss
-             loss = variable_loss + multi_label_loss
-            # Accumulate total loss
-             total_loss += loss.item()
-             total_variable_loss += variable_loss.item()
-             total_multi_label_loss += multi_label_loss.item()
-
-           # For classification report on validatoin data:
-             all_labels.extend(b_multiclass_labels.cpu().numpy())
-             all_preds.extend(torch.argmax(multiclass_logits, axis=1).cpu().numpy())
+# Optuna hyperparameter optimization
+def objective(trial, version, train_data, test_data, loss_fn):
+    lr = trial.suggest_loguniform("lr", default_lr, default_lr) # Use defaults
+    eps = trial.suggest_loguniform("eps", default_eps, default_eps) # Use defaults
+    batch_size = trial.suggest_categorical("batch_size", [16, 32]) # Use defaults
 
 
-     avg_loss = total_loss / len(val_dataloader)
-     avg_variable_loss = total_variable_loss / len(val_dataloader)
-     avg_multi_label_loss = total_multi_label_loss / len(val_dataloader)
-      # Generate report using sklearn if model is classifying multiclass labels:
-     if default_mode == 'multiclass':
-         report = classification_report(all_labels, all_preds)
-         print("\nClassification Report:\n", report)
-     else:
-       print("This dataset is Regression, cannot print Classificaiton report!")
+    train_dataloader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
+    test_dataloader = DataLoader(test_data, batch_size=batch_size)
+
+    model = BertClassifier(version, num_labels=3).to(device)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=lr, eps=eps)
+    total_steps = len(train_dataloader) * 20
+    scheduler = get_scheduler("linear", optimizer=optimizer, num_warmup_steps=0, num_training_steps=total_steps)
+
+    val_f1 = train_and_evaluate(model, train_dataloader, test_dataloader, optimizer, scheduler, epochs=10, loss_fn=loss_fn, version=version)
+    with open("classification_report.txt", "a") as f:
+        f.write(f"Run Parameters for {version}:\n lr: {lr}, eps: {eps}, batch_size: {batch_size}\n\n")
+    return -val_f1 # Optuna minimizes, we want to maximize F1 so return negative F1
 
 
+# Main loop
+for version in version_list:
+    print(f"\n----- Running with {version} -----")
 
-     print(f"Validation Results - Loss: {avg_loss:.6f}, Variable Loss: {avg_variable_loss:.6f}, Multi-label Loss: {avg_multi_label_loss:.6f}")
+    # Load the correct tokenizer for the current version
+    tokenizer = load_tokenizer(version)
+    tokenized_datasets = {split: data.map(lambda examples: tokenize_function(examples, tokenizer), batched=True) for split, data in dataset.items()}
+    train_dataset = tokenized_datasets["train"]
+    test_dataset = tokenized_datasets["test"]
 
-     return avg_loss
-# Start training with early stopping
-model = train(model, train_dataloader, test_dataloader, epochs=10, patience=3)
+    train_data = CustomDataset(train_dataset)
+    test_data = CustomDataset(test_dataset)
+
+    # Oversampling to balance labels
+    train_labels = [item['label'] for item in train_dataset]
+    label_counts = Counter(train_labels)
+    print("Original label distribution:", label_counts)
+    
+    # Calculate Class Weights
+    class_weights = torch.tensor([1.0 / count for count in label_counts.values()], dtype=torch.float)
+    max_weight = max(class_weights)
+    normalized_weights = class_weights / max_weight
+    loss_fn = nn.CrossEntropyLoss(weight=normalized_weights.to(device)) # Weighted Loss
+
+    sampler = RandomOverSampler()
+    train_indices = list(range(len(train_labels)))
+    resampled_indices, resampled_labels = sampler.fit_resample(torch.tensor(train_indices).view(-1, 1), torch.tensor(train_labels))
+    resampled_indices = resampled_indices.flatten().tolist()
+
+    resampled_train_data = torch.utils.data.Subset(train_data, resampled_indices)
+    resampled_label_counts = Counter(resampled_labels)
+    print("Resampled label distribution:", resampled_label_counts)
+
+    # Optuna Hyperparameter Tuning with reduced trials
+    study = optuna.create_study(direction="minimize")
+    study.optimize(lambda trial: objective(trial, version, resampled_train_data, test_data, loss_fn), n_trials=2) # Reduced Trials
+    print("Best hyperparameters:", study.best_params)
+
+    # Final evaluation
+    model = BertClassifier(version, num_labels=3).to(device)  # Update num_labels to match dataset
+    train_dataloader = DataLoader(resampled_train_data, batch_size=study.best_params['batch_size'], shuffle=True)
+    test_dataloader = DataLoader(test_data, batch_size=study.best_params['batch_size'])
+    optimizer = torch.optim.AdamW(model.parameters(), lr=study.best_params['lr'], eps=study.best_params['eps'])
+    scheduler = get_scheduler("linear", optimizer=optimizer, num_warmup_steps=0, num_training_steps=len(train_dataloader) * 10)
+    train_and_evaluate(model, train_dataloader, test_dataloader, optimizer, scheduler, epochs=10, loss_fn=loss_fn, num_classes=3, version=version)
+    generate_classification_report(model, test_dataloader, num_classes=3, version=version)

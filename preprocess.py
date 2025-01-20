@@ -5,8 +5,8 @@ import numpy as np
 
 # List of file paths
 og_paths = [
-    "dec_5_multichannel_combined.csv",
-    "dec_5_streaming_combined.csv"
+    "new_multichannel.csv",
+    "streaming.csv"
 ]
 
 # Initialize an empty list to hold dataframes
@@ -52,9 +52,7 @@ data['label'] = data['label'].map(lambda x: f"{x:.1f}")
 columns_to_keep = [
         "scarcity", "nonuniform_progress", "performance_constraints", "user_heterogeneity", 
         "cognitive", "external", "internal", "coordination", "transactional", "technical", 
-        "demand", "2500partner", "singlepartner", "content_production", "data_center/storage", 
-        "Internet_infra", "content_distribution", "browsers,_apps_&_smart_devices", 
-        "advertising", "end_users", "external_partners", "substitutional_partners",
+        "demand",
         "paragraph", #Special
         "label", #Y
         "source", "length_approx", "singlebott" #Control/utility
