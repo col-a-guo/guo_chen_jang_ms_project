@@ -1,89 +1,111 @@
 import os
-import glob
 import pandas as pd
-import ast
+import glob
 
-# List of base directories
-base_dirs = [
-    r'C:\Users\r2d2go\Downloads\jangmasters\Multi_Even_Completed',
-    r'C:\Users\r2d2go\Downloads\jangmasters\Completed'
-]
+def generate_file_paths(base_path, year, month,extension):
+    """Generates the full file path based on the year and month."""
+    
+    return os.path.join(base_path, str(year), f'combined_{month}_completed.{extension}')
 
-# List to hold dataframes for each file
-combined_df_list = []
+def process_csv_file(file_path, standardized_columns=None):
+    """Reads a CSV file, drops the index column, and returns the DataFrame."""
+    try:
+        df = pd.read_csv(file_path, index_col=None) #Explicitly ignore index when loading.
+        
+        # Drop the 'index' column if it exists
+        if 'index' in df.columns:
+            df = df.drop(columns=['index'])
+        
+        df.columns = df.columns.str.replace('_', ' ')
+        
+        #more aggressive column name cleaning.
+        df.columns = df.columns.str.strip().str.lower()
+        
+        #standardize columns to a given set.
+        if standardized_columns is not None:
+            for col in standardized_columns:
+                if col not in df.columns:
+                    df[col] = None  # add missing column with None
+            df = df[standardized_columns] # reorder to standard columns.
 
-# Loop over the directories
-for base_dir in base_dirs:
-    # Loop over the years from 2007 to 2024
-    for year in range(2007, 2025):
-        year_dir = os.path.join(base_dir, str(year))
-
-        # Check if the directory exists
-        if os.path.exists(year_dir):
-            # Search for CSV and XLSX files
-            csv_files = glob.glob(os.path.join(year_dir, "*.csv"))
-            xlsx_files = glob.glob(os.path.join(year_dir, "*.xlsx"))
-            all_files = csv_files + xlsx_files
-
-            # Process files
-            for file in all_files:
-                try:
-                    # Determine file type and read accordingly
-                    if file.lower().endswith('.csv'):
-                        df = pd.read_csv(file)
-                    elif file.lower().endswith(('.xls', '.xlsx')):
-                        df = pd.read_excel(file)
-                    else:
-                        continue #Skip files with unexpected extensions
-
-                    #Rename columns (same as before)
-                    df.columns = df.columns.str.replace(' ', '_')
-                    paragraph_columns = [col for col in df.columns if "paragraph" in col]
-                    if len(paragraph_columns) > 0:
-                        df.rename(columns={paragraph_columns[0]: "paragraph#"}, inplace=True)
-                        if len(paragraph_columns) > 1:
-                            df.rename(columns={paragraph_columns[1]: "paragraph"}, inplace=True)
+         #make all columns into strings to avoid datetype problems and deal with weird characters
+        for col in df.columns:
+           df[col] = df[col].astype(str)
+                
+        return df
+    except FileNotFoundError:
+        print(f"File not found: {file_path}")
+        return None
+    except Exception as e:
+        print(f"Error processing {file_path}: {e}")
+        return None
 
 
-                    #Clean stage column (same as before)
-                    def clean_stage(stage_value):
-                        if isinstance(stage_value, str):
-                            try:
-                                parsed_list = ast.literal_eval(stage_value)
-                                if isinstance(parsed_list, list):
-                                    return float(sum(parsed_list) / len(parsed_list))
-                            except (ValueError, SyntaxError):
-                                pass
-                        try:
-                            return float(stage_value)
-                        except (ValueError, TypeError):
-                            return stage_value
-                    df['stage'] = df['stage'].apply(clean_stage)
+def get_value(row, col):
+    """Gets a value from a row, returns None if not found"""
+    try:
+        return row[col]
+    except:
+        return None
 
+def main():
+    # Define root paths
+    root_paths = [
+        r"C:\Users\r2d2go\Downloads\jangmasters\Multi_Even_Completed",
+        r"C:\Users\r2d2go\Downloads\jangmasters\Completed"
+    ]
 
-                    # Add length_approx (same as before)
-                    df["paragraph#"] = pd.to_numeric(df["paragraph#"], errors='coerce')
-                    df["length_approx"] = df["paragraph#"].shift(1) - df["paragraph#"]
-                    df["length_approx"] = df.apply(
-                        lambda row: row["paragraph#"] if pd.isna(row["length_approx"]) or row["length_approx"] < 0
-                        else row["length_approx"], axis=1
-                    )
+    start_year = 2007
+    end_year = 2023
+    months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+   
+    # 2. Process and Combine CSV Files
+    all_dataframes = []
+    standardized_columns = None # Initialize to None
 
-                    combined_df_list.append(df)
+    for year in range(start_year, end_year + 1):
+        for month in months:
+            for root_path in root_paths:
+                csv_file_path = generate_file_paths(root_path, year, month,"csv")
+                #check if the file exists using glob, allowing for multiple file extensions.
+                existing_files = glob.glob(csv_file_path.replace(".csv","*"))
+                if existing_files:
+                    df = process_csv_file(existing_files[0], standardized_columns)
+                    if df is not None:
+                        if standardized_columns is None:
+                            standardized_columns = df.columns  #get initial columns from first successful dataframe.
+                        if not df.empty:  # Check if DataFrame is empty before adding it.
+                            all_dataframes.append(df)
 
-                except (pd.errors.EmptyDataError, pd.errors.ParserError, KeyError, pd.errors.ExcelFileError) as e:
-                    print(f"Warning: Skipping file {file} due to error: {e}")
-                except Exception as e:
-                    print(f"Warning: An unexpected error occurred while processing {file}: {e}")
+    if all_dataframes:
+        try:
+            # combine dataframes into a dictionary of lists.
+            combined_dict = {}
+            
+            #initialize all keys in the combined dictionary:
+            for col in standardized_columns:
+                combined_dict[col] = []
 
+            #populate the values of each column
+            for df in all_dataframes:
+              for _, row in df.iterrows():
+                  for col in standardized_columns:
+                      combined_dict[col].append(get_value(row, col))
 
-# Combine all DataFrames into one
-combined_df = pd.concat(combined_df_list, ignore_index=True)
+            combined_df = pd.DataFrame(combined_dict)
 
-# Save the combined DataFrame
-output_path = r'C:\Users\r2d2go\Downloads\jangmasters\guo_chen_jang_ms_project\jan_20_multichannel_combined.csv'
+            print("Data merged successfully.")
+            print(f"Shape of merged dataframe: {combined_df.shape}")
 
-# Save the cleaned CSV
-combined_df.to_csv(output_path, index=False)
+            # OPTIONAL: Save to CSV
+            output_path = r"C:\Users\r2d2go\Downloads\jangmasters\guo_chen_jang_ms_project\jan_20_multichannel_combined.csv"
+            combined_df.to_csv(output_path, index=False)
+            print(f"Data saved to: {output_path}")
+        except Exception as e:
+            print(f"Error During Concatenation: {e}")
+        
+    else:
+        print("No data files were found and merged.")
 
-print(f"All CSVs and XLSXs combined and cleaned into {output_path}")
+if __name__ == "__main__":
+    main()
