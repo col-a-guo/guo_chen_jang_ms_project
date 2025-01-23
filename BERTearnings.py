@@ -12,18 +12,15 @@ from sklearn.metrics import confusion_matrix
 import random
 import numpy as np
 
-# Set the seed early
-seed_value = 42
+seed_value = 1
 random.seed(seed_value)
 np.random.seed(seed_value)
 torch.manual_seed(seed_value)
 torch.cuda.manual_seed_all(seed_value)  # If using CUDA
 
-# Detect GPU
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 
-# Define the versions
 version_list = ["bert-uncased", "bert-uncased-pooling", "businessBERT"]
 
 # Default hyperparameters for Optuna
@@ -61,7 +58,6 @@ Classification Report (Version: {version}, Epoch {epoch if epoch is not None els
     F1 Score (Macro): {f1:.4f}
     """
 
-    # Calculate confusion matrix
     cm = confusion_matrix(all_labels.numpy(), all_preds.numpy(), labels=list(range(num_classes)))
     
     report += "\nConfusion Matrix:\n"
@@ -82,11 +78,10 @@ Classification Report (Version: {version}, Epoch {epoch if epoch is not None els
 
     print(report)
 
-    # Append the report to a text file
     with open("classification_report.txt", "a") as f:
         f.write(report + "\n")
 
-    return f1 # Return F1 score
+    return f1
 
 # Define the model architecture based on version
 class BertClassifier(nn.Module):
@@ -147,19 +142,18 @@ def load_tokenizer(version):
 ogpath = "combined.csv"
 dataset = load_dataset('csv', data_files={'train': "train_" + ogpath, 'test': "test_" + ogpath})
 
-# Truncate dataset to the first entries
+# Truncate dataset; useful to avoid resampling errors due to requesting more samples than exist
+# also reducing to very small numbers for testing
 def truncate_dataset(dataset):
-    k = round(len(dataset)*0.08)
+    k = round(len(dataset)*0.97)
     random_indices = random.sample(range(len(dataset)), k)
     return dataset.select(random_indices)
 
 dataset = {k: truncate_dataset(v) for k, v in dataset.items()}
 
-# Tokenize dataset
 def tokenize_function(examples, tokenizer):
     return tokenizer(examples["paragraph"], padding="max_length", truncation=True, max_length=512)
 
-# Custom dataset
 class CustomDataset(Dataset):
     def __init__(self, dataset):
         self.dataset = dataset
@@ -177,7 +171,7 @@ class CustomDataset(Dataset):
 # Training function
 def train_and_evaluate(model, train_dataloader, val_dataloader, optimizer, scheduler, epochs, loss_fn, patience=3, num_classes=3, version=None):
     model.to(device)
-    best_f1 = 0.0  # Initialize best f1 score
+    best_f1 = 0.0  
     patience_counter = 0
 
     for epoch in range(epochs):
@@ -187,7 +181,7 @@ def train_and_evaluate(model, train_dataloader, val_dataloader, optimizer, sched
             input_ids, attention_mask, labels = [t.to(device) for t in batch]
             model.zero_grad()
             logits = model(input_ids, attention_mask)
-            loss = loss_fn(logits, labels) #  Calculate loss using weighted CrossEntropyLoss
+            loss = loss_fn(logits, labels) # Weighted CrossEntropyLoss
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             optimizer.step()
@@ -221,7 +215,7 @@ def train_and_evaluate(model, train_dataloader, val_dataloader, optimizer, sched
                 print("Early stopping triggered.")
                 break
 
-    return best_f1 # return the best f1 score
+    return best_f1 
 
 # Optuna hyperparameter optimization
 def objective(trial, version, train_data, test_data, loss_fn):
@@ -248,7 +242,6 @@ def objective(trial, version, train_data, test_data, loss_fn):
 for version in version_list:
     print(f"\n----- Running with {version} -----")
 
-    # Load the correct tokenizer for the current version
     tokenizer = load_tokenizer(version)
     tokenized_datasets = {split: data.map(lambda examples: tokenize_function(examples, tokenizer), batched=True) for split, data in dataset.items()}
     train_dataset = tokenized_datasets["train"]
@@ -264,9 +257,12 @@ for version in version_list:
     
     # Calculate Class Weights
     class_weights = torch.tensor([1.0 / count for count in label_counts.values()], dtype=torch.float)
+    #weights based on maximum of 
     max_weight = max(class_weights)
-    normalized_weights = class_weights / max_weight
-    loss_fn = nn.CrossEntropyLoss(weight=normalized_weights.to(device)) # Weighted Loss
+    min_weight = min(class_weights)
+    geom_mean = (max_weight*min_weight)**0.5 #min was bad, max was bad, trying geometric mean
+    normalized_weights = class_weights / geom_mean *3 #loss still too low, multiplying by 3
+    loss_fn = nn.CrossEntropyLoss(weight=normalized_weights.to(device))
 
     sampler = RandomOverSampler()
     train_indices = list(range(len(train_labels)))
