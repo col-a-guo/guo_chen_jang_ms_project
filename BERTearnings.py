@@ -144,7 +144,7 @@ def load_tokenizer(version):
         raise ValueError(f"Invalid model version: {version}")
 
 # Load dataset and preprocess
-ogpath = "combined.csv"
+ogpath = "stitched.csv"
 dataset = load_dataset('csv', data_files={'train': "train_" + ogpath, 'test': "test_" + ogpath})
 
 # Truncate dataset to the first entries

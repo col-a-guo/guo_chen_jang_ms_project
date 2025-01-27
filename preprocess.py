@@ -5,8 +5,8 @@ import numpy as np
 
 # List of file paths
 og_paths = [
-    "new_multichannel.csv",
-    "streaming.csv"
+    "jan_20_multichannel_combined.csv",
+    "jan_20_streaming_combined.csv"
 ]
 
 # Initialize an empty list to hold dataframes
@@ -55,7 +55,7 @@ columns_to_keep = [
         "demand",
         "paragraph", #Special
         "label", #Y
-        "source", "length_approx", "singlebott" #Control/utility
+        #"source", "length_approx", "singlebott" #Control/utility
 ]
 data = data[columns_to_keep].fillna(0)
 
@@ -69,10 +69,16 @@ type_columns = [
     "user_heterogeneity", "cognitive", "external", "internal", "transactional",
     "coordination", "technical", "demand"
 ]
+
+# Ensure all columns in type_columns are numeric
+for col in type_columns:
+    data[col] = pd.to_numeric(data[col], errors='coerce')
+
+# Now calculate "number_of_types"
 data["number_of_types"] = data[type_columns].sum(axis=1) / 10
 
 # Save the combined data
-data.to_csv("dec_5_combined.csv", index=False)
+data.to_csv("jan_20_combined.csv", index=False)
 
 # Split into train and test datasets
 train_df, test_df = train_test_split(data, test_size=0.2, random_state=1, stratify=data['label'])

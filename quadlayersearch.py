@@ -15,7 +15,7 @@ from imblearn.over_sampling import RandomOverSampler
 from imblearn.under_sampling import RandomUnderSampler
 
 # Load datasets
-combined = pd.read_csv("combined.csv")
+combined = pd.read_csv("stitched.csv")
 streaming = pd.read_csv("streaming.csv")
 multichannel = pd.read_csv("multichannel_search.csv")
 
@@ -42,7 +42,7 @@ multichannel = preprocess_data(multichannel, add_length_approx=False)
 # Define labels and features for the datasets
 labels = [
     "transactional", "external", 
-    "coordination", "technical", "demand"]
+    "cognitive", "scarcity", "internal"]
 
 # Setup control variables
 def prepare_X_data(data, labels, control_vars):
@@ -51,7 +51,7 @@ def prepare_X_data(data, labels, control_vars):
     return pd.DataFrame(scaler.fit_transform(X), columns=X.columns)
 
 # Control variables
-control_vars = ["number_of_types", "word_count"]
+control_vars = []
 
 # Prepare data for each dataset (excluding 'length_approx' as requested)
 X_combined = prepare_X_data(combined, labels, control_vars)

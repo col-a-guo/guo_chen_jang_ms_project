@@ -4640,3 +4640,1681 @@ Per-Class Metrics:
   Class 1: TP=33, FP=22, TN=905, FN=43
   Class 2: TP=6, FP=10, TN=962, FN=25
 
+
+Classification Report (Version: bert-uncased, Epoch 1):
+    Accuracy: 0.8345
+    Precision (Macro): 0.5134
+    Recall (Macro): 0.6483
+    F1 Score (Macro): 0.5509
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1370    203    27
+      1   37    89    7
+      2   10    8    13
+
+Per-Class Metrics:
+  Class 0: TP=1370, FP=47, TN=117, FN=230
+  Class 1: TP=89, FP=211, TN=1420, FN=44
+  Class 2: TP=13, FP=34, TN=1699, FN=18
+
+
+Classification Report (Version: bert-uncased, Epoch 2):
+    Accuracy: 0.9053
+    Precision (Macro): 0.5926
+    Recall (Macro): 0.6596
+    F1 Score (Macro): 0.6210
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1505    72    23
+      1   48    78    7
+      2   10    7    14
+
+Per-Class Metrics:
+  Class 0: TP=1505, FP=58, TN=106, FN=95
+  Class 1: TP=78, FP=79, TN=1552, FN=55
+  Class 2: TP=14, FP=30, TN=1703, FN=17
+
+
+Classification Report (Version: bert-uncased, Epoch 3):
+    Accuracy: 0.9031
+    Precision (Macro): 0.5832
+    Recall (Macro): 0.6716
+    F1 Score (Macro): 0.6165
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1499    68    33
+      1   47    79    7
+      2   9    7    15
+
+Per-Class Metrics:
+  Class 0: TP=1499, FP=56, TN=108, FN=101
+  Class 1: TP=79, FP=75, TN=1556, FN=54
+  Class 2: TP=15, FP=40, TN=1693, FN=16
+
+
+Classification Report (Version: bert-uncased, Epoch 4):
+    Accuracy: 0.9133
+    Precision (Macro): 0.6057
+    Recall (Macro): 0.6753
+    F1 Score (Macro): 0.6296
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1517    48    35
+      1   47    79    7
+      2   9    7    15
+
+Per-Class Metrics:
+  Class 0: TP=1517, FP=56, TN=108, FN=83
+  Class 1: TP=79, FP=55, TN=1576, FN=54
+  Class 2: TP=15, FP=42, TN=1691, FN=16
+
+
+Classification Report (Version: bert-uncased, Epoch 5):
+    Accuracy: 0.9002
+    Precision (Macro): 0.5745
+    Recall (Macro): 0.6563
+    F1 Score (Macro): 0.6075
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1493    79    28
+      1   44    82    7
+      2   11    7    13
+
+Per-Class Metrics:
+  Class 0: TP=1493, FP=55, TN=109, FN=107
+  Class 1: TP=82, FP=86, TN=1545, FN=51
+  Class 2: TP=13, FP=35, TN=1698, FN=18
+
+
+Classification Report (Version: bert-uncased, Epoch 6):
+    Accuracy: 0.9048
+    Precision (Macro): 0.5884
+    Recall (Macro): 0.6699
+    F1 Score (Macro): 0.6200
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1503    67    30
+      1   48    78    7
+      2   9    7    15
+
+Per-Class Metrics:
+  Class 0: TP=1503, FP=57, TN=107, FN=97
+  Class 1: TP=78, FP=74, TN=1557, FN=55
+  Class 2: TP=15, FP=37, TN=1696, FN=16
+
+
+Classification Report (Version: bert-uncased, Epoch 7):
+    Accuracy: 0.9223
+    Precision (Macro): 0.6308
+    Recall (Macro): 0.6727
+    F1 Score (Macro): 0.6479
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1532    45    23
+      1   45    81    7
+      2   10    7    14
+
+Per-Class Metrics:
+  Class 0: TP=1532, FP=55, TN=109, FN=68
+  Class 1: TP=81, FP=52, TN=1579, FN=52
+  Class 2: TP=14, FP=30, TN=1703, FN=17
+
+
+Classification Report (Version: bert-uncased, Epoch 8):
+    Accuracy: 0.8934
+    Precision (Macro): 0.5687
+    Recall (Macro): 0.6703
+    F1 Score (Macro): 0.5942
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1481    53    66
+      1   46    80    7
+      2   9    7    15
+
+Per-Class Metrics:
+  Class 0: TP=1481, FP=55, TN=109, FN=119
+  Class 1: TP=80, FP=60, TN=1571, FN=53
+  Class 2: TP=15, FP=73, TN=1660, FN=16
+
+
+Classification Report (Version: bert-uncased, Epoch 9):
+    Accuracy: 0.9110
+    Precision (Macro): 0.5958
+    Recall (Macro): 0.6534
+    F1 Score (Macro): 0.6197
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1515    59    26
+      1   47    79    7
+      2   10    8    13
+
+Per-Class Metrics:
+  Class 0: TP=1515, FP=57, TN=107, FN=85
+  Class 1: TP=79, FP=67, TN=1564, FN=54
+  Class 2: TP=13, FP=33, TN=1700, FN=18
+
+
+Classification Report (Version: bert-uncased, Epoch 10):
+    Accuracy: 0.9082
+    Precision (Macro): 0.5890
+    Recall (Macro): 0.6547
+    F1 Score (Macro): 0.6161
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1509    64    27
+      1   46    80    7
+      2   10    8    13
+
+Per-Class Metrics:
+  Class 0: TP=1509, FP=56, TN=108, FN=91
+  Class 1: TP=80, FP=72, TN=1559, FN=53
+  Class 2: TP=13, FP=34, TN=1699, FN=18
+
+Run Parameters for bert-uncased:
+ lr: 5.841204543279205e-05, eps: 6.748313060587885e-08, batch_size: 32
+
+
+Classification Report (Version: bert-uncased, Epoch 1):
+    Accuracy: 0.8237
+    Precision (Macro): 0.4767
+    Recall (Macro): 0.6470
+    F1 Score (Macro): 0.5137
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1357    153    90
+      1   43    81    9
+      2   8    8    15
+
+Per-Class Metrics:
+  Class 0: TP=1357, FP=51, TN=113, FN=243
+  Class 1: TP=81, FP=161, TN=1470, FN=52
+  Class 2: TP=15, FP=99, TN=1634, FN=16
+
+
+Classification Report (Version: bert-uncased, Epoch 2):
+    Accuracy: 0.9138
+    Precision (Macro): 0.6053
+    Recall (Macro): 0.6544
+    F1 Score (Macro): 0.6257
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1520    55    25
+      1   47    79    7
+      2   12    6    13
+
+Per-Class Metrics:
+  Class 0: TP=1520, FP=59, TN=105, FN=80
+  Class 1: TP=79, FP=61, TN=1570, FN=54
+  Class 2: TP=13, FP=32, TN=1701, FN=18
+
+
+Classification Report (Version: bert-uncased, Epoch 3):
+    Accuracy: 0.8798
+    Precision (Macro): 0.5507
+    Recall (Macro): 0.6947
+    F1 Score (Macro): 0.5836
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1455    67    78
+      1   43    79    11
+      2   6    7    18
+
+Per-Class Metrics:
+  Class 0: TP=1455, FP=49, TN=115, FN=145
+  Class 1: TP=79, FP=74, TN=1557, FN=54
+  Class 2: TP=18, FP=89, TN=1644, FN=13
+
+
+Classification Report (Version: bert-uncased, Epoch 4):
+    Accuracy: 0.8957
+    Precision (Macro): 0.5651
+    Recall (Macro): 0.6712
+    F1 Score (Macro): 0.6011
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1485    72    43
+      1   45    80    8
+      2   9    7    15
+
+Per-Class Metrics:
+  Class 0: TP=1485, FP=54, TN=110, FN=115
+  Class 1: TP=80, FP=79, TN=1552, FN=53
+  Class 2: TP=15, FP=51, TN=1682, FN=16
+
+
+Classification Report (Version: bert-uncased, Epoch 5):
+    Accuracy: 0.9116
+    Precision (Macro): 0.6054
+    Recall (Macro): 0.6807
+    F1 Score (Macro): 0.6270
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1515    44    41
+      1   48    77    8
+      2   9    6    16
+
+Per-Class Metrics:
+  Class 0: TP=1515, FP=57, TN=107, FN=85
+  Class 1: TP=77, FP=50, TN=1581, FN=56
+  Class 2: TP=16, FP=49, TN=1684, FN=15
+
+
+Classification Report (Version: bert-uncased, Epoch 6):
+    Accuracy: 0.9002
+    Precision (Macro): 0.5868
+    Recall (Macro): 0.6811
+    F1 Score (Macro): 0.6240
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1493    80    27
+      1   47    79    7
+      2   8    7    16
+
+Per-Class Metrics:
+  Class 0: TP=1493, FP=55, TN=109, FN=107
+  Class 1: TP=79, FP=87, TN=1544, FN=54
+  Class 2: TP=16, FP=34, TN=1699, FN=15
+
+
+Classification Report (Version: bert-uncased, Epoch 7):
+    Accuracy: 0.9155
+    Precision (Macro): 0.6072
+    Recall (Macro): 0.6597
+    F1 Score (Macro): 0.6288
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1521    53    26
+      1   45    81    7
+      2   11    7    13
+
+Per-Class Metrics:
+  Class 0: TP=1521, FP=56, TN=108, FN=79
+  Class 1: TP=81, FP=60, TN=1571, FN=52
+  Class 2: TP=13, FP=33, TN=1700, FN=18
+
+
+Classification Report (Version: bert-uncased, Epoch 8):
+    Accuracy: 0.9104
+    Precision (Macro): 0.6063
+    Recall (Macro): 0.6931
+    F1 Score (Macro): 0.6310
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1511    45    44
+      1   48    78    7
+      2   8    6    17
+
+Per-Class Metrics:
+  Class 0: TP=1511, FP=56, TN=108, FN=89
+  Class 1: TP=78, FP=51, TN=1580, FN=55
+  Class 2: TP=17, FP=51, TN=1682, FN=14
+
+
+Classification Report (Version: bert-uncased, Epoch 9):
+    Accuracy: 0.9206
+    Precision (Macro): 0.6224
+    Recall (Macro): 0.6524
+    F1 Score (Macro): 0.6332
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1534    41    25
+      1   49    77    7
+      2   11    7    13
+
+Per-Class Metrics:
+  Class 0: TP=1534, FP=60, TN=104, FN=66
+  Class 1: TP=77, FP=48, TN=1583, FN=56
+  Class 2: TP=13, FP=32, TN=1701, FN=18
+
+
+Classification Report (Version: bert-uncased, Epoch 10):
+    Accuracy: 0.9167
+    Precision (Macro): 0.6149
+    Recall (Macro): 0.6660
+    F1 Score (Macro): 0.6347
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1524    49    27
+      1   47    79    7
+      2   11    6    14
+
+Per-Class Metrics:
+  Class 0: TP=1524, FP=58, TN=106, FN=76
+  Class 1: TP=79, FP=55, TN=1576, FN=54
+  Class 2: TP=14, FP=34, TN=1699, FN=17
+
+Run Parameters for bert-uncased:
+ lr: 5.841204543279205e-05, eps: 6.748313060587885e-08, batch_size: 16
+
+
+Classification Report (Version: bert-uncased, Epoch 1):
+    Accuracy: 0.8690
+    Precision (Macro): 0.5321
+    Recall (Macro): 0.6600
+    F1 Score (Macro): 0.5757
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1435    130    35
+      1   42    84    7
+      2   11    6    14
+
+Per-Class Metrics:
+  Class 0: TP=1435, FP=53, TN=111, FN=165
+  Class 1: TP=84, FP=136, TN=1495, FN=49
+  Class 2: TP=14, FP=42, TN=1691, FN=17
+
+
+Classification Report (Version: bert-uncased, Epoch 2):
+    Accuracy: 0.9184
+    Precision (Macro): 0.6173
+    Recall (Macro): 0.6653
+    F1 Score (Macro): 0.6379
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1524    53    23
+      1   43    83    7
+      2   12    6    13
+
+Per-Class Metrics:
+  Class 0: TP=1524, FP=55, TN=109, FN=76
+  Class 1: TP=83, FP=59, TN=1572, FN=50
+  Class 2: TP=13, FP=30, TN=1703, FN=18
+
+
+Classification Report (Version: bert-uncased, Epoch 3):
+    Accuracy: 0.8963
+    Precision (Macro): 0.5748
+    Recall (Macro): 0.6677
+    F1 Score (Macro): 0.6118
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1484    90    26
+      1   43    83    7
+      2   10    7    14
+
+Per-Class Metrics:
+  Class 0: TP=1484, FP=53, TN=111, FN=116
+  Class 1: TP=83, FP=97, TN=1534, FN=50
+  Class 2: TP=14, FP=33, TN=1700, FN=17
+
+
+Classification Report (Version: bert-uncased, Epoch 4):
+    Accuracy: 0.9167
+    Precision (Macro): 0.6176
+    Recall (Macro): 0.6729
+    F1 Score (Macro): 0.6411
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1521    56    23
+      1   44    82    7
+      2   11    6    14
+
+Per-Class Metrics:
+  Class 0: TP=1521, FP=55, TN=109, FN=79
+  Class 1: TP=82, FP=62, TN=1569, FN=51
+  Class 2: TP=14, FP=30, TN=1703, FN=17
+
+
+Classification Report (Version: bert-uncased, Epoch 5):
+    Accuracy: 0.8906
+    Precision (Macro): 0.5693
+    Recall (Macro): 0.6725
+    F1 Score (Macro): 0.6092
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1471    104    25
+      1   40    86    7
+      2   10    7    14
+
+Per-Class Metrics:
+  Class 0: TP=1471, FP=50, TN=114, FN=129
+  Class 1: TP=86, FP=111, TN=1520, FN=47
+  Class 2: TP=14, FP=32, TN=1701, FN=17
+
+
+Classification Report (Version: bert-uncased, Epoch 6):
+    Accuracy: 0.9172
+    Precision (Macro): 0.6196
+    Recall (Macro): 0.6837
+    F1 Score (Macro): 0.6457
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1521    54    25
+      1   44    82    7
+      2   9    7    15
+
+Per-Class Metrics:
+  Class 0: TP=1521, FP=53, TN=111, FN=79
+  Class 1: TP=82, FP=61, TN=1570, FN=51
+  Class 2: TP=15, FP=32, TN=1701, FN=16
+
+
+Classification Report (Version: bert-uncased, Epoch 7):
+    Accuracy: 0.8940
+    Precision (Macro): 0.5775
+    Recall (Macro): 0.6669
+    F1 Score (Macro): 0.6134
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1480    98    22
+      1   43    83    7
+      2   10    7    14
+
+Per-Class Metrics:
+  Class 0: TP=1480, FP=53, TN=111, FN=120
+  Class 1: TP=83, FP=105, TN=1526, FN=50
+  Class 2: TP=14, FP=29, TN=1704, FN=17
+
+
+Classification Report (Version: bert-uncased, Epoch 8):
+    Accuracy: 0.9206
+    Precision (Macro): 0.6263
+    Recall (Macro): 0.6721
+    F1 Score (Macro): 0.6453
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1529    48    23
+      1   45    81    7
+      2   10    7    14
+
+Per-Class Metrics:
+  Class 0: TP=1529, FP=55, TN=109, FN=71
+  Class 1: TP=81, FP=55, TN=1576, FN=52
+  Class 2: TP=14, FP=30, TN=1703, FN=17
+
+
+Classification Report (Version: bert-uncased, Epoch 9):
+    Accuracy: 0.9189
+    Precision (Macro): 0.6235
+    Recall (Macro): 0.6669
+    F1 Score (Macro): 0.6417
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1528    50    22
+      1   47    79    7
+      2   10    7    14
+
+Per-Class Metrics:
+  Class 0: TP=1528, FP=57, TN=107, FN=72
+  Class 1: TP=79, FP=57, TN=1574, FN=54
+  Class 2: TP=14, FP=29, TN=1704, FN=17
+
+
+Classification Report (Version: bert-uncased, Epoch Final):
+    Accuracy: 0.9189
+    Precision (Macro): 0.6235
+    Recall (Macro): 0.6669
+    F1 Score (Macro): 0.6417
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1528    50    22
+      1   47    79    7
+      2   10    7    14
+
+Per-Class Metrics:
+  Class 0: TP=1528, FP=57, TN=107, FN=72
+  Class 1: TP=79, FP=57, TN=1574, FN=54
+  Class 2: TP=14, FP=29, TN=1704, FN=17
+
+
+Classification Report (Version: bert-uncased-pooling, Epoch 1):
+    Accuracy: 0.8067
+    Precision (Macro): 0.5052
+    Recall (Macro): 0.6463
+    F1 Score (Macro): 0.5382
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1321    253    26
+      1   38    88    7
+      2   10    7    14
+
+Per-Class Metrics:
+  Class 0: TP=1321, FP=48, TN=116, FN=279
+  Class 1: TP=88, FP=260, TN=1371, FN=45
+  Class 2: TP=14, FP=33, TN=1700, FN=17
+
+
+Classification Report (Version: bert-uncased-pooling, Epoch 2):
+    Accuracy: 0.8821
+    Precision (Macro): 0.5542
+    Recall (Macro): 0.6671
+    F1 Score (Macro): 0.5959
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1457    115    28
+      1   41    85    7
+      2   10    7    14
+
+Per-Class Metrics:
+  Class 0: TP=1457, FP=51, TN=113, FN=143
+  Class 1: TP=85, FP=122, TN=1509, FN=48
+  Class 2: TP=14, FP=35, TN=1698, FN=17
+
+
+Classification Report (Version: bert-uncased-pooling, Epoch 3):
+    Accuracy: 0.8974
+    Precision (Macro): 0.5657
+    Recall (Macro): 0.6635
+    F1 Score (Macro): 0.6004
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1488    72    40
+      1   44    81    8
+      2   10    7    14
+
+Per-Class Metrics:
+  Class 0: TP=1488, FP=54, TN=110, FN=112
+  Class 1: TP=81, FP=79, TN=1552, FN=52
+  Class 2: TP=14, FP=48, TN=1685, FN=17
+
+
+Classification Report (Version: bert-uncased-pooling, Epoch 4):
+    Accuracy: 0.9031
+    Precision (Macro): 0.5804
+    Recall (Macro): 0.6574
+    F1 Score (Macro): 0.6119
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1498    75    27
+      1   44    82    7
+      2   11    7    13
+
+Per-Class Metrics:
+  Class 0: TP=1498, FP=55, TN=109, FN=102
+  Class 1: TP=82, FP=82, TN=1549, FN=51
+  Class 2: TP=13, FP=34, TN=1699, FN=18
+
+
+Classification Report (Version: bert-uncased-pooling, Epoch 5):
+    Accuracy: 0.9065
+    Precision (Macro): 0.5858
+    Recall (Macro): 0.6600
+    F1 Score (Macro): 0.6112
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1507    54    39
+      1   48    78    7
+      2   10    7    14
+
+Per-Class Metrics:
+  Class 0: TP=1507, FP=58, TN=106, FN=93
+  Class 1: TP=78, FP=61, TN=1570, FN=55
+  Class 2: TP=14, FP=46, TN=1687, FN=17
+
+
+Classification Report (Version: bert-uncased-pooling, Epoch 6):
+    Accuracy: 0.9008
+    Precision (Macro): 0.5863
+    Recall (Macro): 0.6790
+    F1 Score (Macro): 0.6075
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1495    45    60
+      1   47    78    8
+      2   9    6    16
+
+Per-Class Metrics:
+  Class 0: TP=1495, FP=56, TN=108, FN=105
+  Class 1: TP=78, FP=51, TN=1580, FN=55
+  Class 2: TP=16, FP=68, TN=1665, FN=15
+
+
+Classification Report (Version: bert-uncased-pooling, Epoch 7):
+    Accuracy: 0.9133
+    Precision (Macro): 0.6037
+    Recall (Macro): 0.6542
+    F1 Score (Macro): 0.6251
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1519    57    24
+      1   47    79    7
+      2   11    7    13
+
+Per-Class Metrics:
+  Class 0: TP=1519, FP=58, TN=106, FN=81
+  Class 1: TP=79, FP=64, TN=1567, FN=54
+  Class 2: TP=13, FP=31, TN=1702, FN=18
+
+
+Classification Report (Version: bert-uncased-pooling, Epoch 8):
+    Accuracy: 0.9031
+    Precision (Macro): 0.5840
+    Recall (Macro): 0.6528
+    F1 Score (Macro): 0.6130
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1500    76    24
+      1   46    80    7
+      2   12    6    13
+
+Per-Class Metrics:
+  Class 0: TP=1500, FP=58, TN=106, FN=100
+  Class 1: TP=80, FP=82, TN=1549, FN=53
+  Class 2: TP=13, FP=31, TN=1702, FN=18
+
+
+Classification Report (Version: bert-uncased-pooling, Epoch 9):
+    Accuracy: 0.9195
+    Precision (Macro): 0.6194
+    Recall (Macro): 0.6542
+    F1 Score (Macro): 0.6332
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1531    45    24
+      1   48    78    7
+      2   11    7    13
+
+Per-Class Metrics:
+  Class 0: TP=1531, FP=59, TN=105, FN=69
+  Class 1: TP=78, FP=52, TN=1579, FN=55
+  Class 2: TP=13, FP=31, TN=1702, FN=18
+
+
+Classification Report (Version: bert-uncased-pooling, Epoch 10):
+    Accuracy: 0.9161
+    Precision (Macro): 0.6166
+    Recall (Macro): 0.6741
+    F1 Score (Macro): 0.6381
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1523    49    28
+      1   48    78    7
+      2   10    6    15
+
+Per-Class Metrics:
+  Class 0: TP=1523, FP=58, TN=106, FN=77
+  Class 1: TP=78, FP=55, TN=1576, FN=55
+  Class 2: TP=15, FP=35, TN=1698, FN=16
+
+Run Parameters for bert-uncased-pooling:
+ lr: 5.841204543279205e-05, eps: 6.748313060587885e-08, batch_size: 16
+
+
+Classification Report (Version: bert-uncased-pooling, Epoch 1):
+    Accuracy: 0.7982
+    Precision (Macro): 0.5131
+    Recall (Macro): 0.6904
+    F1 Score (Macro): 0.5242
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1307    77    216
+      1   39    81    13
+      2   4    7    20
+
+Per-Class Metrics:
+  Class 0: TP=1307, FP=43, TN=121, FN=293
+  Class 1: TP=81, FP=84, TN=1547, FN=52
+  Class 2: TP=20, FP=229, TN=1504, FN=11
+
+
+Classification Report (Version: bert-uncased-pooling, Epoch 2):
+    Accuracy: 0.8526
+    Precision (Macro): 0.5161
+    Recall (Macro): 0.6494
+    F1 Score (Macro): 0.5584
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1408    158    34
+      1   44    82    7
+      2   8    9    14
+
+Per-Class Metrics:
+  Class 0: TP=1408, FP=52, TN=112, FN=192
+  Class 1: TP=82, FP=167, TN=1464, FN=51
+  Class 2: TP=14, FP=41, TN=1692, FN=17
+
+
+Classification Report (Version: bert-uncased-pooling, Epoch 3):
+    Accuracy: 0.8991
+    Precision (Macro): 0.5752
+    Recall (Macro): 0.6513
+    F1 Score (Macro): 0.6066
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1493    82    25
+      1   46    80    7
+      2   11    7    13
+
+Per-Class Metrics:
+  Class 0: TP=1493, FP=57, TN=107, FN=107
+  Class 1: TP=80, FP=89, TN=1542, FN=53
+  Class 2: TP=13, FP=32, TN=1701, FN=18
+
+
+Classification Report (Version: bert-uncased-pooling, Epoch 4):
+    Accuracy: 0.8934
+    Precision (Macro): 0.5630
+    Recall (Macro): 0.6680
+    F1 Score (Macro): 0.5931
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1482    61    57
+      1   46    79    8
+      2   9    7    15
+
+Per-Class Metrics:
+  Class 0: TP=1482, FP=55, TN=109, FN=118
+  Class 1: TP=79, FP=68, TN=1563, FN=54
+  Class 2: TP=15, FP=65, TN=1668, FN=16
+
+
+Classification Report (Version: bert-uncased-pooling, Epoch 5):
+    Accuracy: 0.8963
+    Precision (Macro): 0.5740
+    Recall (Macro): 0.6819
+    F1 Score (Macro): 0.6007
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1485    52    63
+      1   43    80    10
+      2   8    7    16
+
+Per-Class Metrics:
+  Class 0: TP=1485, FP=51, TN=113, FN=115
+  Class 1: TP=80, FP=59, TN=1572, FN=53
+  Class 2: TP=16, FP=73, TN=1660, FN=15
+
+
+Classification Report (Version: bert-uncased-pooling, Epoch 6):
+    Accuracy: 0.8968
+    Precision (Macro): 0.5813
+    Recall (Macro): 0.6844
+    F1 Score (Macro): 0.6045
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1485    46    69
+      1   45    81    7
+      2   8    7    16
+
+Per-Class Metrics:
+  Class 0: TP=1485, FP=53, TN=111, FN=115
+  Class 1: TP=81, FP=53, TN=1578, FN=52
+  Class 2: TP=16, FP=76, TN=1657, FN=15
+
+Run Parameters for bert-uncased-pooling:
+ lr: 5.841204543279205e-05, eps: 6.748313060587885e-08, batch_size: 16
+
+
+Classification Report (Version: bert-uncased-pooling, Epoch 1):
+    Accuracy: 0.8605
+    Precision (Macro): 0.5251
+    Recall (Macro): 0.6441
+    F1 Score (Macro): 0.5650
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1422    149    29
+      1   43    83    7
+      2   10    8    13
+
+Per-Class Metrics:
+  Class 0: TP=1422, FP=53, TN=111, FN=178
+  Class 1: TP=83, FP=157, TN=1474, FN=50
+  Class 2: TP=13, FP=36, TN=1697, FN=18
+
+
+Classification Report (Version: bert-uncased-pooling, Epoch 2):
+    Accuracy: 0.8832
+    Precision (Macro): 0.5377
+    Recall (Macro): 0.6455
+    F1 Score (Macro): 0.5751
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1465    91    44
+      1   46    80    7
+      2   10    8    13
+
+Per-Class Metrics:
+  Class 0: TP=1465, FP=56, TN=108, FN=135
+  Class 1: TP=80, FP=99, TN=1532, FN=53
+  Class 2: TP=13, FP=51, TN=1682, FN=18
+
+
+Classification Report (Version: bert-uncased-pooling, Epoch 3):
+    Accuracy: 0.9048
+    Precision (Macro): 0.5884
+    Recall (Macro): 0.6534
+    F1 Score (Macro): 0.6161
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1503    74    23
+      1   46    80    7
+      2   12    6    13
+
+Per-Class Metrics:
+  Class 0: TP=1503, FP=58, TN=106, FN=97
+  Class 1: TP=80, FP=80, TN=1551, FN=53
+  Class 2: TP=13, FP=30, TN=1703, FN=18
+
+
+Classification Report (Version: bert-uncased-pooling, Epoch 4):
+    Accuracy: 0.8968
+    Precision (Macro): 0.5708
+    Recall (Macro): 0.6459
+    F1 Score (Macro): 0.6018
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1491    84    25
+      1   48    78    7
+      2   11    7    13
+
+Per-Class Metrics:
+  Class 0: TP=1491, FP=59, TN=105, FN=109
+  Class 1: TP=78, FP=91, TN=1540, FN=55
+  Class 2: TP=13, FP=32, TN=1701, FN=18
+
+
+Classification Report (Version: bert-uncased-pooling, Epoch 5):
+    Accuracy: 0.8673
+    Precision (Macro): 0.5247
+    Recall (Macro): 0.6374
+    F1 Score (Macro): 0.5642
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1438    129    33
+      1   47    79    7
+      2   11    7    13
+
+Per-Class Metrics:
+  Class 0: TP=1438, FP=58, TN=106, FN=162
+  Class 1: TP=79, FP=136, TN=1495, FN=54
+  Class 2: TP=13, FP=40, TN=1693, FN=18
+
+
+Classification Report (Version: bert-uncased-pooling, Epoch 6):
+    Accuracy: 0.9082
+    Precision (Macro): 0.5916
+    Recall (Macro): 0.6501
+    F1 Score (Macro): 0.6162
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1511    64    25
+      1   48    78    7
+      2   11    7    13
+
+Per-Class Metrics:
+  Class 0: TP=1511, FP=59, TN=105, FN=89
+  Class 1: TP=78, FP=71, TN=1560, FN=55
+  Class 2: TP=13, FP=32, TN=1701, FN=18
+
+
+Classification Report (Version: bert-uncased-pooling, Epoch 7):
+    Accuracy: 0.9127
+    Precision (Macro): 0.6046
+    Recall (Macro): 0.6517
+    F1 Score (Macro): 0.6251
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1519    59    22
+      1   48    78    7
+      2   11    7    13
+
+Per-Class Metrics:
+  Class 0: TP=1519, FP=59, TN=105, FN=81
+  Class 1: TP=78, FP=66, TN=1565, FN=55
+  Class 2: TP=13, FP=29, TN=1704, FN=18
+
+
+Classification Report (Version: bert-uncased-pooling, Epoch 8):
+    Accuracy: 0.9127
+    Precision (Macro): 0.6016
+    Recall (Macro): 0.6517
+    F1 Score (Macro): 0.6225
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1519    56    25
+      1   48    78    7
+      2   11    7    13
+
+Per-Class Metrics:
+  Class 0: TP=1519, FP=59, TN=105, FN=81
+  Class 1: TP=78, FP=63, TN=1568, FN=55
+  Class 2: TP=13, FP=32, TN=1701, FN=18
+
+
+Classification Report (Version: bert-uncased-pooling, Epoch 9):
+    Accuracy: 0.9053
+    Precision (Macro): 0.5870
+    Recall (Macro): 0.6490
+    F1 Score (Macro): 0.6133
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1506    70    24
+      1   48    78    7
+      2   11    7    13
+
+Per-Class Metrics:
+  Class 0: TP=1506, FP=59, TN=105, FN=94
+  Class 1: TP=78, FP=77, TN=1554, FN=55
+  Class 2: TP=13, FP=31, TN=1702, FN=18
+
+
+Classification Report (Version: bert-uncased-pooling, Epoch 10):
+    Accuracy: 0.9121
+    Precision (Macro): 0.6012
+    Recall (Macro): 0.6515
+    F1 Score (Macro): 0.6225
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1518    58    24
+      1   48    78    7
+      2   11    7    13
+
+Per-Class Metrics:
+  Class 0: TP=1518, FP=59, TN=105, FN=82
+  Class 1: TP=78, FP=65, TN=1566, FN=55
+  Class 2: TP=13, FP=31, TN=1702, FN=18
+
+
+Classification Report (Version: bert-uncased-pooling, Epoch Final):
+    Accuracy: 0.9121
+    Precision (Macro): 0.6012
+    Recall (Macro): 0.6515
+    F1 Score (Macro): 0.6225
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1518    58    24
+      1   48    78    7
+      2   11    7    13
+
+Per-Class Metrics:
+  Class 0: TP=1518, FP=59, TN=105, FN=82
+  Class 1: TP=78, FP=65, TN=1566, FN=55
+  Class 2: TP=13, FP=31, TN=1702, FN=18
+
+
+Classification Report (Version: businessBERT, Epoch 1):
+    Accuracy: 0.8509
+    Precision (Macro): 0.5032
+    Recall (Macro): 0.6451
+    F1 Score (Macro): 0.5457
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1403    150    47
+      1   41    85    7
+      2   11    7    13
+
+Per-Class Metrics:
+  Class 0: TP=1403, FP=52, TN=112, FN=197
+  Class 1: TP=85, FP=157, TN=1474, FN=48
+  Class 2: TP=13, FP=54, TN=1679, FN=18
+
+
+Classification Report (Version: businessBERT, Epoch 2):
+    Accuracy: 0.8872
+    Precision (Macro): 0.5603
+    Recall (Macro): 0.6607
+    F1 Score (Macro): 0.5987
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1466    109    25
+      1   40    86    7
+      2   11    7    13
+
+Per-Class Metrics:
+  Class 0: TP=1466, FP=51, TN=113, FN=134
+  Class 1: TP=86, FP=116, TN=1515, FN=47
+  Class 2: TP=13, FP=32, TN=1701, FN=18
+
+
+Classification Report (Version: businessBERT, Epoch 3):
+    Accuracy: 0.8855
+    Precision (Macro): 0.5478
+    Recall (Macro): 0.6555
+    F1 Score (Macro): 0.5875
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1465    101    34
+      1   42    84    7
+      2   11    7    13
+
+Per-Class Metrics:
+  Class 0: TP=1465, FP=53, TN=111, FN=135
+  Class 1: TP=84, FP=108, TN=1523, FN=49
+  Class 2: TP=13, FP=41, TN=1692, FN=18
+
+
+Classification Report (Version: businessBERT, Epoch 4):
+    Accuracy: 0.9144
+    Precision (Macro): 0.6098
+    Recall (Macro): 0.6711
+    F1 Score (Macro): 0.6278
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1521    42    37
+      1   48    77    8
+      2   10    6    15
+
+Per-Class Metrics:
+  Class 0: TP=1521, FP=58, TN=106, FN=79
+  Class 1: TP=77, FP=48, TN=1583, FN=56
+  Class 2: TP=15, FP=45, TN=1688, FN=16
+
+
+Classification Report (Version: businessBERT, Epoch 5):
+    Accuracy: 0.9042
+    Precision (Macro): 0.5814
+    Recall (Macro): 0.6555
+    F1 Score (Macro): 0.6116
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1501    71    28
+      1   45    81    7
+      2   11    7    13
+
+Per-Class Metrics:
+  Class 0: TP=1501, FP=56, TN=108, FN=99
+  Class 1: TP=81, FP=78, TN=1553, FN=52
+  Class 2: TP=13, FP=35, TN=1698, FN=18
+
+
+Classification Report (Version: businessBERT, Epoch 6):
+    Accuracy: 0.9099
+    Precision (Macro): 0.5901
+    Recall (Macro): 0.6507
+    F1 Score (Macro): 0.6131
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1514    55    31
+      1   47    78    8
+      2   11    7    13
+
+Per-Class Metrics:
+  Class 0: TP=1514, FP=58, TN=106, FN=86
+  Class 1: TP=78, FP=62, TN=1569, FN=55
+  Class 2: TP=13, FP=39, TN=1694, FN=18
+
+
+Classification Report (Version: businessBERT, Epoch 7):
+    Accuracy: 0.9155
+    Precision (Macro): 0.6090
+    Recall (Macro): 0.6551
+    F1 Score (Macro): 0.6284
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1523    53    24
+      1   47    79    7
+      2   11    7    13
+
+Per-Class Metrics:
+  Class 0: TP=1523, FP=58, TN=106, FN=77
+  Class 1: TP=79, FP=60, TN=1571, FN=54
+  Class 2: TP=13, FP=31, TN=1702, FN=18
+
+
+Classification Report (Version: businessBERT, Epoch 8):
+    Accuracy: 0.9189
+    Precision (Macro): 0.6187
+    Recall (Macro): 0.6540
+    F1 Score (Macro): 0.6332
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1530    47    23
+      1   48    78    7
+      2   11    7    13
+
+Per-Class Metrics:
+  Class 0: TP=1530, FP=59, TN=105, FN=70
+  Class 1: TP=78, FP=54, TN=1577, FN=55
+  Class 2: TP=13, FP=30, TN=1703, FN=18
+
+
+Classification Report (Version: businessBERT, Epoch 9):
+    Accuracy: 0.9138
+    Precision (Macro): 0.6072
+    Recall (Macro): 0.6521
+    F1 Score (Macro): 0.6267
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1521    57    22
+      1   48    78    7
+      2   11    7    13
+
+Per-Class Metrics:
+  Class 0: TP=1521, FP=59, TN=105, FN=79
+  Class 1: TP=78, FP=64, TN=1567, FN=55
+  Class 2: TP=13, FP=29, TN=1704, FN=18
+
+
+Classification Report (Version: businessBERT, Epoch 10):
+    Accuracy: 0.9201
+    Precision (Macro): 0.6204
+    Recall (Macro): 0.6544
+    F1 Score (Macro): 0.6333
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1532    43    25
+      1   48    78    7
+      2   11    7    13
+
+Per-Class Metrics:
+  Class 0: TP=1532, FP=59, TN=105, FN=68
+  Class 1: TP=78, FP=50, TN=1581, FN=55
+  Class 2: TP=13, FP=32, TN=1701, FN=18
+
+Run Parameters for businessBERT:
+ lr: 5.841204543279205e-05, eps: 6.748313060587885e-08, batch_size: 16
+
+
+Classification Report (Version: businessBERT, Epoch 1):
+    Accuracy: 0.8895
+    Precision (Macro): 0.5558
+    Recall (Macro): 0.6666
+    F1 Score (Macro): 0.5894
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1475    70    55
+      1   47    79    7
+      2   10    6    15
+
+Per-Class Metrics:
+  Class 0: TP=1475, FP=57, TN=107, FN=125
+  Class 1: TP=79, FP=76, TN=1555, FN=54
+  Class 2: TP=15, FP=62, TN=1671, FN=16
+
+
+Classification Report (Version: businessBERT, Epoch 2):
+    Accuracy: 0.9076
+    Precision (Macro): 0.5932
+    Recall (Macro): 0.6732
+    F1 Score (Macro): 0.6182
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1507    50    43
+      1   47    79    7
+      2   10    6    15
+
+Per-Class Metrics:
+  Class 0: TP=1507, FP=57, TN=107, FN=93
+  Class 1: TP=79, FP=56, TN=1575, FN=54
+  Class 2: TP=15, FP=50, TN=1683, FN=16
+
+
+Classification Report (Version: businessBERT, Epoch 3):
+    Accuracy: 0.9104
+    Precision (Macro): 0.5935
+    Recall (Macro): 0.6601
+    F1 Score (Macro): 0.6204
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1511    60    29
+      1   44    82    7
+      2   11    7    13
+
+Per-Class Metrics:
+  Class 0: TP=1511, FP=55, TN=109, FN=89
+  Class 1: TP=82, FP=67, TN=1564, FN=51
+  Class 2: TP=13, FP=36, TN=1697, FN=18
+
+
+Classification Report (Version: businessBERT, Epoch 4):
+    Accuracy: 0.9155
+    Precision (Macro): 0.6084
+    Recall (Macro): 0.6528
+    F1 Score (Macro): 0.6257
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1524    49    27
+      1   48    78    7
+      2   12    6    13
+
+Per-Class Metrics:
+  Class 0: TP=1524, FP=60, TN=104, FN=76
+  Class 1: TP=78, FP=55, TN=1576, FN=55
+  Class 2: TP=13, FP=34, TN=1699, FN=18
+
+
+Classification Report (Version: businessBERT, Epoch 5):
+    Accuracy: 0.9104
+    Precision (Macro): 0.5959
+    Recall (Macro): 0.6532
+    F1 Score (Macro): 0.6193
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1514    59    27
+      1   47    79    7
+      2   12    6    13
+
+Per-Class Metrics:
+  Class 0: TP=1514, FP=59, TN=105, FN=86
+  Class 1: TP=79, FP=65, TN=1566, FN=54
+  Class 2: TP=13, FP=34, TN=1699, FN=18
+
+
+Classification Report (Version: businessBERT, Epoch 6):
+    Accuracy: 0.9184
+    Precision (Macro): 0.6185
+    Recall (Macro): 0.6538
+    F1 Score (Macro): 0.6330
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1529    48    23
+      1   48    78    7
+      2   12    6    13
+
+Per-Class Metrics:
+  Class 0: TP=1529, FP=60, TN=104, FN=71
+  Class 1: TP=78, FP=54, TN=1577, FN=55
+  Class 2: TP=13, FP=30, TN=1703, FN=18
+
+
+Classification Report (Version: businessBERT, Epoch 7):
+    Accuracy: 0.9087
+    Precision (Macro): 0.5948
+    Recall (Macro): 0.6526
+    F1 Score (Macro): 0.6194
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1511    65    24
+      1   47    79    7
+      2   12    6    13
+
+Per-Class Metrics:
+  Class 0: TP=1511, FP=59, TN=105, FN=89
+  Class 1: TP=79, FP=71, TN=1560, FN=54
+  Class 2: TP=13, FP=31, TN=1702, FN=18
+
+
+Classification Report (Version: businessBERT, Epoch 8):
+    Accuracy: 0.9218
+    Precision (Macro): 0.6339
+    Recall (Macro): 0.6762
+    F1 Score (Macro): 0.6493
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1533    42    25
+      1   48    78    7
+      2   10    6    15
+
+Per-Class Metrics:
+  Class 0: TP=1533, FP=58, TN=106, FN=67
+  Class 1: TP=78, FP=48, TN=1583, FN=55
+  Class 2: TP=15, FP=32, TN=1701, FN=16
+
+
+Classification Report (Version: businessBERT, Epoch 9):
+    Accuracy: 0.9212
+    Precision (Macro): 0.6280
+    Recall (Macro): 0.6654
+    F1 Score (Macro): 0.6423
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1533    43    24
+      1   48    78    7
+      2   10    7    14
+
+Per-Class Metrics:
+  Class 0: TP=1533, FP=58, TN=106, FN=67
+  Class 1: TP=78, FP=50, TN=1581, FN=55
+  Class 2: TP=14, FP=31, TN=1702, FN=17
+
+
+Classification Report (Version: businessBERT, Epoch 10):
+    Accuracy: 0.9223
+    Precision (Macro): 0.6312
+    Recall (Macro): 0.6704
+    F1 Score (Macro): 0.6459
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1533    42    25
+      1   46    80    7
+      2   11    6    14
+
+Per-Class Metrics:
+  Class 0: TP=1533, FP=57, TN=107, FN=67
+  Class 1: TP=80, FP=48, TN=1583, FN=53
+  Class 2: TP=14, FP=32, TN=1701, FN=17
+
+Run Parameters for businessBERT:
+ lr: 5.841204543279205e-05, eps: 6.748313060587885e-08, batch_size: 16
+
+
+Classification Report (Version: businessBERT, Epoch 1):
+    Accuracy: 0.8124
+    Precision (Macro): 0.4776
+    Recall (Macro): 0.6286
+    F1 Score (Macro): 0.5147
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1336    219    45
+      1   42    84    7
+      2   11    7    13
+
+Per-Class Metrics:
+  Class 0: TP=1336, FP=53, TN=111, FN=264
+  Class 1: TP=84, FP=226, TN=1405, FN=49
+  Class 2: TP=13, FP=52, TN=1681, FN=18
+
+
+Classification Report (Version: businessBERT, Epoch 2):
+    Accuracy: 0.9229
+    Precision (Macro): 0.6313
+    Recall (Macro): 0.6555
+    F1 Score (Macro): 0.6400
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1537    40    23
+      1   48    78    7
+      2   12    6    13
+
+Per-Class Metrics:
+  Class 0: TP=1537, FP=60, TN=104, FN=63
+  Class 1: TP=78, FP=46, TN=1585, FN=55
+  Class 2: TP=13, FP=30, TN=1703, FN=18
+
+
+Classification Report (Version: businessBERT, Epoch 3):
+    Accuracy: 0.9065
+    Precision (Macro): 0.5903
+    Recall (Macro): 0.6577
+    F1 Score (Macro): 0.6176
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1508    66    26
+      1   48    77    8
+      2   11    6    14
+
+Per-Class Metrics:
+  Class 0: TP=1508, FP=59, TN=105, FN=92
+  Class 1: TP=77, FP=72, TN=1559, FN=56
+  Class 2: TP=14, FP=34, TN=1699, FN=17
+
+
+Classification Report (Version: businessBERT, Epoch 4):
+    Accuracy: 0.9184
+    Precision (Macro): 0.6154
+    Recall (Macro): 0.6561
+    F1 Score (Macro): 0.6318
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1528    47    25
+      1   47    79    7
+      2   11    7    13
+
+Per-Class Metrics:
+  Class 0: TP=1528, FP=58, TN=106, FN=72
+  Class 1: TP=79, FP=54, TN=1577, FN=54
+  Class 2: TP=13, FP=32, TN=1701, FN=18
+
+
+Classification Report (Version: businessBERT, Epoch 5):
+    Accuracy: 0.9189
+    Precision (Macro): 0.6164
+    Recall (Macro): 0.6563
+    F1 Score (Macro): 0.6319
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1529    45    26
+      1   47    79    7
+      2   11    7    13
+
+Per-Class Metrics:
+  Class 0: TP=1529, FP=58, TN=106, FN=71
+  Class 1: TP=79, FP=52, TN=1579, FN=54
+  Class 2: TP=13, FP=33, TN=1700, FN=18
+
+
+Classification Report (Version: businessBERT, Epoch Final):
+    Accuracy: 0.9189
+    Precision (Macro): 0.6164
+    Recall (Macro): 0.6563
+    F1 Score (Macro): 0.6319
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1529    45    26
+      1   47    79    7
+      2   11    7    13
+
+Per-Class Metrics:
+  Class 0: TP=1529, FP=58, TN=106, FN=71
+  Class 1: TP=79, FP=52, TN=1579, FN=54
+  Class 2: TP=13, FP=33, TN=1700, FN=18
+

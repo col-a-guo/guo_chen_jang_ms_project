@@ -11,7 +11,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # Load and preprocess the data
-data = pd.read_csv("combined.csv")
+data = pd.read_csv("stitched.csv")
 data.label = data.label.apply(pd.to_numeric)
 data = data.fillna(0)
 
@@ -26,7 +26,7 @@ labels_for_quad = [
 ]
 
 # Define control variables
-control_features = ["number_of_types", "word_count", "source"]
+control_features = ["number_of_types", "word_count"]
 
 # Generate polynomial features using only `labels_for_quad`
 poly = PolynomialFeatures(degree=2, include_bias=False)
@@ -100,7 +100,7 @@ def iterative_feature_dropping(X_train, y_train, X_test, y_test, stacking_clf, i
     return surviving_features
 
 # Run iterative feature dropping
-surviving_features = iterative_feature_dropping(X_train, y_train, X_test, y_test, stacking_clf, iterations=5, drop_percent=0.08)
+surviving_features = iterative_feature_dropping(X_train, y_train, X_test, y_test, stacking_clf, iterations=5, drop_percent=0.15)
 
 # Final training with surviving features
 stacking_clf.fit(X_train[surviving_features], y_train)
