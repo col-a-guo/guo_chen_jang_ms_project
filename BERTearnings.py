@@ -5,10 +5,10 @@ from torch.utils.data import DataLoader, Dataset
 from transformers import get_scheduler
 from datasets import load_dataset
 from collections import Counter
-from imblearn.over_sampling import RandomOverSampler
+from imblearn.under_sampling import RandomUnderSampler
 import torchmetrics
 import optuna
-from sklearn.metrics import confusion_matrix
+from sklearn.metrics import confusion_matrix, classification_report
 import random
 import numpy as np
 
@@ -21,7 +21,7 @@ torch.cuda.manual_seed_all(seed_value)  # If using CUDA
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 
-version_list = ["bert-uncased", "bert-uncased-pooling", "businessBERT"]
+version_list = ["bert-uncased", "businessBERT", "colaguo-working"]  # Updated version list
 
 # Default hyperparameters for Optuna
 default_lr = 5.841204543279205e-05
@@ -38,103 +38,95 @@ def generate_classification_report(model, dataloader, num_classes, epoch=None, v
             input_ids, attention_mask, labels = [t.to(device) for t in batch]
             logits = model(input_ids, attention_mask)
             preds = torch.argmax(logits, dim=1)  # Multi-class prediction
-            all_preds.extend(preds.cpu())
-            all_labels.extend(labels.cpu())
+            all_preds.extend(preds.cpu().numpy())
+            all_labels.extend(labels.cpu().numpy())
 
-    all_preds = torch.tensor(all_preds)
-    all_labels = torch.tensor(all_labels)
+    # Convert to numpy arrays for sklearn functions
+    all_preds = np.array(all_preds)
+    all_labels = np.array(all_labels)
 
-    # Update metrics to include task
-    accuracy = torchmetrics.Accuracy(task='multiclass', num_classes=num_classes)(all_preds, all_labels)
-    precision = torchmetrics.Precision(task='multiclass', num_classes=num_classes, average='macro')(all_preds, all_labels)
-    recall = torchmetrics.Recall(task='multiclass', num_classes=num_classes, average='macro')(all_preds, all_labels)
-    f1 = torchmetrics.F1Score(task='multiclass', num_classes=num_classes, average='macro')(all_preds, all_labels)
-
-    report = f"""
-Classification Report (Version: {version}, Epoch {epoch if epoch is not None else 'Final'}):
-    Accuracy: {accuracy:.4f}
-    Precision (Macro): {precision:.4f}
-    Recall (Macro): {recall:.4f}
-    F1 Score (Macro): {f1:.4f}
-    """
-
-    cm = confusion_matrix(all_labels.numpy(), all_preds.numpy(), labels=list(range(num_classes)))
+    # Generate sklearn classification report
+    report = classification_report(all_labels, all_preds, target_names=[str(i) for i in range(num_classes)], zero_division=0) # Added zero_division
     
-    report += "\nConfusion Matrix:\n"
-    report += "            Predicted\n"
-    report += "           " + "    ".join(map(str, range(num_classes))) + "\n"
-    report += "Actual\n"
+    # Confusion Matrix
+    cm = confusion_matrix(all_labels, all_preds, labels=list(range(num_classes)))
+    cm_report = "\nConfusion Matrix:\n"
+    cm_report += "            Predicted\n"
+    cm_report += "           " + "    ".join(map(str, range(num_classes))) + "\n"
+    cm_report += "Actual\n"
     for i, row in enumerate(cm):
-        report += f"      {i}   " + "    ".join(map(str, row)) + "\n"
+        cm_report += f"      {i}   " + "    ".join(map(str, row)) + "\n"
     
-    # Calculate and add TP, FP, TN, FN per class
-    report += "\nPer-Class Metrics:\n"
-    for i in range(num_classes):
-        tp = cm[i, i]
-        fp = cm[:, i].sum() - tp
-        fn = cm[i, :].sum() - tp
-        tn = cm.sum() - tp - fp - fn
-        report += f"  Class {i}: TP={tp}, FP={fp}, TN={tn}, FN={fn}\n"
 
-    print(report)
+    final_report = f"""
+Classification Report (Version: {version}, Epoch {epoch if epoch is not None else 'Final'}):\n
+{report}\n
+{cm_report}
+"""
 
+
+    print(final_report)
     with open("classification_report.txt", "a") as f:
-        f.write(report + "\n")
+        f.write(final_report + "\n")
+    
+    f1 = classification_report(all_labels, all_preds, target_names=[str(i) for i in range(num_classes)], output_dict=True, zero_division=0)['macro avg']['f1-score'] # Added zero_division
 
     return f1
 
-# Define the model architecture based on version
+# Define the model architecture (using global pooling for all versions)
 class BertClassifier(nn.Module):
     def __init__(self, version, num_labels=1, freeze_bert=False):
         super(BertClassifier, self).__init__()
 
-        if version == "bert-uncased" or version == "bert-uncased-pooling":
+        if version == "bert-uncased":
             self.bert = AutoModel.from_pretrained('google-bert/bert-base-uncased')
         elif version == "businessBERT":
             self.bert = AutoModel.from_pretrained('pborchert/BusinessBERT')
+        elif version == "colaguo-working":
+            self.bert = AutoModel.from_pretrained('colaguo/working')
         else:
            raise ValueError(f"Invalid model version: {version}")
         
         self.version = version  # Store the version
         
-        if self.version == "bert-uncased-pooling":
-            self.cls_head = nn.Sequential(
-                nn.Linear(self.bert.config.hidden_size, 128),
-                nn.ReLU(),
-                nn.Linear(128, num_labels)
-            )
-            self.pooling = nn.AdaptiveAvgPool1d(1) # Global average pooling layer
+        self.cls_head = nn.Sequential(
+            nn.Linear(self.bert.config.hidden_size, 128),
+            nn.ReLU(),
+            nn.Linear(128, num_labels)
+        )
+        # more or less linear layers
+        # linear 128 -> num_labels
 
-        else:
-            self.cls_head = nn.Sequential(
-                nn.Linear(self.bert.config.hidden_size, 128),
-                nn.ReLU(),
-                nn.Linear(128, num_labels)
-            )
+        self.pooling = nn.AdaptiveAvgPool1d(1) # Global average pooling layer
+
 
         if freeze_bert:
             for param in self.bert.parameters():
                 param.requires_grad = False
 
+    #TODO: Add bottleneck features here
+                #feedforward, sequential, 11 -> 8 -> num_labels, concatenate with pooled
+                #try simple concatenate, then try lower weight/layer down to 128, 64, etc
+                #try business, our bert, hybridization, ??
+                #
+                
     def forward(self, input_ids, attention_mask):
-            outputs = self.bert(input_ids=input_ids, attention_mask=attention_mask)
+        outputs = self.bert(input_ids=input_ids, attention_mask=attention_mask)
+        # Global average pooling
+        last_hidden_state = outputs.last_hidden_state
+        pooled_output = self.pooling(last_hidden_state.permute(0, 2, 1)).squeeze(-1)
+        logits = self.cls_head(pooled_output)
+        return logits
 
-            if self.version == "bert-uncased-pooling":
-                # Global average pooling
-                last_hidden_state = outputs.last_hidden_state
-                pooled_output = self.pooling(last_hidden_state.permute(0, 2, 1)).squeeze(-1)
-                logits = self.cls_head(pooled_output)
-            else:
-                cls_output = outputs.last_hidden_state[:, 0, :]  # [CLS] token representation
-                logits = self.cls_head(cls_output)
-            return logits
 
 # Function to load the correct tokenizer
 def load_tokenizer(version):
-    if version == "bert-uncased" or version == "bert-uncased-pooling":
+    if version == "bert-uncased":
         return AutoTokenizer.from_pretrained('google-bert/bert-base-uncased')
     elif version == "businessBERT":
         return AutoTokenizer.from_pretrained('pborchert/BusinessBERT')
+    elif version == "colaguo-working":
+        return AutoTokenizer.from_pretrained('colaguo/bottleneckBERT')
     else:
         raise ValueError(f"Invalid model version: {version}")
 
@@ -150,6 +142,14 @@ def truncate_dataset(dataset):
     return dataset.select(random_indices)
 
 dataset = {k: truncate_dataset(v) for k, v in dataset.items()}
+
+
+# Filter out label 2
+def filter_label_2(dataset):
+    filtered_dataset = dataset.filter(lambda example: example['label'] != 2)
+    return filtered_dataset
+
+dataset = {k: filter_label_2(v) for k, v in dataset.items()}
 
 def tokenize_function(examples, tokenizer):
     return tokenizer(examples["paragraph"], padding="max_length", truncation=True, max_length=512)
@@ -169,7 +169,7 @@ class CustomDataset(Dataset):
         return input_ids, attention_mask, label
 
 # Training function
-def train_and_evaluate(model, train_dataloader, val_dataloader, optimizer, scheduler, epochs, loss_fn, patience=3, num_classes=3, version=None):
+def train_and_evaluate(model, train_dataloader, val_dataloader, optimizer, scheduler, epochs, loss_fn, patience=7, num_classes=2, version=None):
     model.to(device)
     best_f1 = 0.0  
     patience_counter = 0
@@ -227,12 +227,12 @@ def objective(trial, version, train_data, test_data, loss_fn):
     train_dataloader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
     test_dataloader = DataLoader(test_data, batch_size=batch_size)
 
-    model = BertClassifier(version, num_labels=3).to(device)
+    model = BertClassifier(version, num_labels=2).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr, eps=eps)
     total_steps = len(train_dataloader) * 20
     scheduler = get_scheduler("linear", optimizer=optimizer, num_warmup_steps=0, num_training_steps=total_steps)
 
-    val_f1 = train_and_evaluate(model, train_dataloader, test_dataloader, optimizer, scheduler, epochs=10, loss_fn=loss_fn, version=version)
+    val_f1 = train_and_evaluate(model, train_dataloader, test_dataloader, optimizer, scheduler, epochs=30, loss_fn=loss_fn, version=version)
     with open("classification_report.txt", "a") as f:
         f.write(f"Run Parameters for {version}:\n lr: {lr}, eps: {eps}, batch_size: {batch_size}\n\n")
     return -val_f1 # Optuna minimizes, we want to maximize F1 so return negative F1
@@ -250,28 +250,48 @@ for version in version_list:
     train_data = CustomDataset(train_dataset)
     test_data = CustomDataset(test_dataset)
 
-    # Oversampling to balance labels
+    # Undersampling to balance labels
     train_labels = [item['label'] for item in train_dataset]
     label_counts = Counter(train_labels)
     print("Original label distribution:", label_counts)
+
+    # Determine the minimum count of a class
+    min_count = min(label_counts.values())
     
-    # Calculate Class Weights
-    class_weights = torch.tensor([1.0 / count for count in label_counts.values()], dtype=torch.float)
-    #weights based on maximum of 
-    max_weight = max(class_weights)
-    min_weight = min(class_weights)
-    geom_mean = (max_weight*min_weight)**0.5 #min was bad, max was bad, trying geometric mean
-    normalized_weights = class_weights / geom_mean *3 #loss still too low, multiplying by 3
-    loss_fn = nn.CrossEntropyLoss(weight=normalized_weights.to(device))
-
-    sampler = RandomOverSampler()
+    # Apply undersampling to the training data
+    sampler = RandomUnderSampler(sampling_strategy={0: min_count*6, 1: min_count}) #4000:4000
     train_indices = list(range(len(train_labels)))
-    resampled_indices, resampled_labels = sampler.fit_resample(torch.tensor(train_indices).view(-1, 1), torch.tensor(train_labels))
+    resampled_indices, resampled_labels = sampler.fit_resample(np.array(train_indices).reshape(-1, 1), np.array(train_labels))
     resampled_indices = resampled_indices.flatten().tolist()
-
+    
     resampled_train_data = torch.utils.data.Subset(train_data, resampled_indices)
     resampled_label_counts = Counter(resampled_labels)
     print("Resampled label distribution:", resampled_label_counts)
+
+
+    #Disable reweighting for now
+    # # Calculate Class Weights
+    # class_weights = torch.tensor([1.0 / count for count in label_counts.values()], dtype=torch.float)
+    # #weights based on maximum of 
+    # max_weight = max(class_weights)
+    # min_weight = min(class_weights)
+    # geom_mean = (max_weight*min_weight)**0.5 #min was bad, max was bad, trying geometric mean
+    # normalized_weights = class_weights / geom_mean 
+    normalized_weights = torch.tensor([0.2, 2.0])
+    loss_fn = nn.CrossEntropyLoss(weight=normalized_weights.to(device))
+    
+    # Initialize Model, Print Initial Weights
+    model = BertClassifier(version, num_labels=2).to(device) # Initialize before weights
+    print(f"\n----- Initial Weights for {version} -----")
+    print("\nBERT Initial Weights:")
+    for name, param in model.bert.named_parameters():
+      if "weight" in name: # Only print weights
+        print(f"  {name}: {param.data}")
+    
+    print("\nClassification Head Initial Weights:")
+    for name, param in model.cls_head.named_parameters():
+      if "weight" in name:
+        print(f"  {name}: {param.data}")
 
     # Optuna Hyperparameter Tuning with reduced trials
     study = optuna.create_study(direction="minimize")
@@ -279,10 +299,10 @@ for version in version_list:
     print("Best hyperparameters:", study.best_params)
 
     # Final evaluation
-    model = BertClassifier(version, num_labels=3).to(device)  # Update num_labels to match dataset
+    model = BertClassifier(version, num_labels=2).to(device)  # Update num_labels to match dataset
     train_dataloader = DataLoader(resampled_train_data, batch_size=study.best_params['batch_size'], shuffle=True)
     test_dataloader = DataLoader(test_data, batch_size=study.best_params['batch_size'])
     optimizer = torch.optim.AdamW(model.parameters(), lr=study.best_params['lr'], eps=study.best_params['eps'])
     scheduler = get_scheduler("linear", optimizer=optimizer, num_warmup_steps=0, num_training_steps=len(train_dataloader) * 10)
-    train_and_evaluate(model, train_dataloader, test_dataloader, optimizer, scheduler, epochs=30, loss_fn=loss_fn, num_classes=3, version=version)
-    generate_classification_report(model, test_dataloader, num_classes=3, version=version)
+    train_and_evaluate(model, train_dataloader, test_dataloader, optimizer, scheduler, epochs=30, loss_fn=loss_fn, num_classes=2, version=version)
+    generate_classification_report(model, test_dataloader, num_classes=2, version=version)
