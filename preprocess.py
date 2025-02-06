@@ -5,8 +5,8 @@ import numpy as np
 
 # List of file paths
 og_paths = [
-    "jan_20_multichannel_combined.csv",
-    "jan_20_streaming_combined.csv"
+    r"guo_chen_jang_ms_project\feb_6_multichannel_combined.csv",
+    r"guo_chen_jang_ms_project\feb_6_streaming_combined.csv"
 ]
 
 # Initialize an empty list to hold dataframes
@@ -77,8 +77,10 @@ for col in type_columns:
 # Now calculate "number_of_types"
 data["number_of_types"] = data[type_columns].sum(axis=1) / 10
 
+print(data)
+
 # Save the combined data
-data.to_csv("jan_20_combined.csv", index=False)
+data.to_csv("feb_6_combined.csv", index=False)
 
 # Split into train and test datasets
 train_df, test_df = train_test_split(data, test_size=0.2, random_state=1, stratify=data['label'])
