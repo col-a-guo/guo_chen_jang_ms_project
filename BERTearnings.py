@@ -185,7 +185,7 @@ class CustomDataset(Dataset):
         return input_ids, attention_mask, features, label
 
 # Training function
-def train_and_evaluate(model, train_dataloader, val_dataloader, optimizer, scheduler, epochs, loss_fn, patience=7, num_classes=2, version=None):
+def train_and_evaluate(model, train_dataloader, val_dataloader, optimizer, scheduler, epochs, loss_fn, patience=7, num_classes=3, version=None):
     model.to(device)
     best_f1 = 0.0  
     patience_counter = 0
@@ -320,5 +320,5 @@ for version in version_list:
     test_dataloader = DataLoader(test_data, batch_size=study.best_params['batch_size'])
     optimizer = torch.optim.AdamW(model.parameters(), lr=study.best_params['lr'], eps=study.best_params['eps'])
     scheduler = get_scheduler("linear", optimizer=optimizer, num_warmup_steps=0, num_training_steps=len(train_dataloader) * 10)
-    train_and_evaluate(model, train_dataloader, test_dataloader, optimizer, scheduler, epochs=30, loss_fn=loss_fn, num_classes=2, version=version)
-    generate_classification_report(model, test_dataloader, num_classes=2, version=version)
+    train_and_evaluate(model, train_dataloader, test_dataloader, optimizer, scheduler, epochs=30, loss_fn=loss_fn, num_classes=3, version=version)
+    generate_classification_report(model, test_dataloader, num_classes=3, version=version)
