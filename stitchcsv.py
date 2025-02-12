@@ -5,7 +5,7 @@ def stitch_and_split_csvs(csv1_path, csv2_path, output_base_path, test_size=0.2,
     """
     Stitches two CSV files, ensures "label" is the first column, then splits the combined
     data into train and test sets, saving each to separate files.  Filters to only include
-    rows where the "stage" column in combined.csv is 1.0.
+    rows where the "stage" column in combined.csv is 1.0 or 2.0
 
     Args:
         csv1_path (str): Path to the first CSV file (combined.csv).
@@ -24,8 +24,8 @@ def stitch_and_split_csvs(csv1_path, csv2_path, output_base_path, test_size=0.2,
         print(f"Error: {e}")
         return
 
-    # Filter df1 to only include rows where 'stage' is 1.0
-    df1 = df1[df1['label'] == 1.0]
+    # Filter df1 
+    df1 = df1[df1['label'] != 0.0]
 
     # Get the unique column names from both DataFrames
     all_columns = list(set(df1.columns) | set(df2.columns))
