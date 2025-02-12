@@ -35,8 +35,8 @@ def generate_classification_report(model, dataloader, num_classes, epoch=None, v
     all_labels = []
     with torch.no_grad():
         for batch in dataloader:
-            input_ids, attention_mask, labels = [t.to(device) for t in batch]
-            logits = model(input_ids, attention_mask)
+            input_ids, attention_mask, features, labels = [t.to(device) for t in batch]
+            logits = model(input_ids, attention_mask, features)
             preds = torch.argmax(logits, dim=1)  # Multi-class prediction
             all_preds.extend(preds.cpu().numpy())
             all_labels.extend(labels.cpu().numpy())
@@ -89,11 +89,17 @@ class BertClassifier(nn.Module):
         
         self.version = version  # Store the version
         
+        self.linear_features = nn.Sequential(
+            nn.Linear(11, 8),
+            nn.ReLU()
+        )
+
         self.cls_head = nn.Sequential(
             nn.Linear(self.bert.config.hidden_size, 128),
-            nn.ReLU(),
-            nn.Linear(128, num_labels)
+            nn.ReLU()
         )
+
+        self.final_classifier = nn.Linear(128 + 8, num_labels)
         # more or less linear layers
         # linear 128 -> num_labels
 
@@ -108,15 +114,24 @@ class BertClassifier(nn.Module):
                 #feedforward, sequential, 11 -> 8 -> num_labels, concatenate with pooled
                 #try simple concatenate, then try lower weight/layer down to 128, 64, etc
                 #try business, our bert, hybridization, ??
-                #
+                #focus on / find tokens with captum?
+                #check library for past reports maybe
                 
-    def forward(self, input_ids, attention_mask):
+    def forward(self, input_ids, attention_mask, features):
         outputs = self.bert(input_ids=input_ids, attention_mask=attention_mask)
         # Global average pooling
         last_hidden_state = outputs.last_hidden_state
         pooled_output = self.pooling(last_hidden_state.permute(0, 2, 1)).squeeze(-1)
-        logits = self.cls_head(pooled_output)
+        
+        bert_output = self.cls_head(pooled_output)
+
+        linear_features_output = self.linear_features(features)
+        
+        combined_output = torch.cat((bert_output, linear_features_output), dim=1)
+
+        logits = self.final_classifier(combined_output)
         return logits
+
 
 
 # Function to load the correct tokenizer
@@ -166,7 +181,8 @@ class CustomDataset(Dataset):
         input_ids = torch.tensor(item['input_ids'])
         attention_mask = torch.tensor(item['attention_mask'])
         label = torch.tensor(item['label'], dtype=torch.long)
-        return input_ids, attention_mask, label
+        features = torch.tensor([item['scarcity'], item['nonuniform_progress'], item['performance_constraints'], item['user_heterogeneity'], item['cognitive'], item['external'], item['internal'], item['coordination'], item['transactional'], item['technical'], item['demand']], dtype=torch.float)
+        return input_ids, attention_mask, features, label
 
 # Training function
 def train_and_evaluate(model, train_dataloader, val_dataloader, optimizer, scheduler, epochs, loss_fn, patience=7, num_classes=2, version=None):
@@ -178,9 +194,9 @@ def train_and_evaluate(model, train_dataloader, val_dataloader, optimizer, sched
         model.train()
         total_loss = 0
         for batch in train_dataloader:
-            input_ids, attention_mask, labels = [t.to(device) for t in batch]
+            input_ids, attention_mask, features, labels = [t.to(device) for t in batch]
             model.zero_grad()
-            logits = model(input_ids, attention_mask)
+            logits = model(input_ids, attention_mask, features)
             loss = loss_fn(logits, labels) # Weighted CrossEntropyLoss
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
@@ -195,8 +211,8 @@ def train_and_evaluate(model, train_dataloader, val_dataloader, optimizer, sched
         val_loss = 0
         with torch.no_grad():
             for batch in val_dataloader:
-                input_ids, attention_mask, labels = [t.to(device) for t in batch]
-                logits = model(input_ids, attention_mask)
+                input_ids, attention_mask, features, labels = [t.to(device) for t in batch]
+                logits = model(input_ids, attention_mask, features)
                 val_loss += loss_fn(logits, labels).item() # Calculate validation loss using weighted CrossEntropyLoss
 
         avg_val_loss = val_loss / len(val_dataloader)
@@ -259,7 +275,7 @@ for version in version_list:
     min_count = min(label_counts.values())
     
     # Apply undersampling to the training data
-    sampler = RandomUnderSampler(sampling_strategy={0: min_count*6, 1: min_count}) #4000:4000
+    sampler = RandomUnderSampler(sampling_strategy={0: min_count*8, 1: min_count}) #3200:400
     train_indices = list(range(len(train_labels)))
     resampled_indices, resampled_labels = sampler.fit_resample(np.array(train_indices).reshape(-1, 1), np.array(train_labels))
     resampled_indices = resampled_indices.flatten().tolist()
@@ -277,7 +293,7 @@ for version in version_list:
     # min_weight = min(class_weights)
     # geom_mean = (max_weight*min_weight)**0.5 #min was bad, max was bad, trying geometric mean
     # normalized_weights = class_weights / geom_mean 
-    normalized_weights = torch.tensor([0.2, 2.0])
+    normalized_weights = torch.tensor([0.2, 1.0])
     loss_fn = nn.CrossEntropyLoss(weight=normalized_weights.to(device))
     
     # Initialize Model, Print Initial Weights
