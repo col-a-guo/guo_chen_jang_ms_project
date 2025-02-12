@@ -146,7 +146,7 @@ def load_tokenizer(version):
         raise ValueError(f"Invalid model version: {version}")
 
 # Load dataset and preprocess
-ogpath = "stitched.csv"
+ogpath = "feb_6_stitched.csv"
 dataset = load_dataset('csv', data_files={'train': "train_" + ogpath, 'test': "test_" + ogpath})
 
 # Truncate dataset; useful to avoid resampling errors due to requesting more samples than exist
@@ -275,7 +275,7 @@ for version in version_list:
     min_count = min(label_counts.values())
     
     # Apply undersampling to the training data
-    sampler = RandomUnderSampler(sampling_strategy={0: min_count*8, 1: min_count}) #3200:400
+    sampler = RandomUnderSampler(sampling_strategy={0: min_count*3, 1: min_count}) #3200:400
     train_indices = list(range(len(train_labels)))
     resampled_indices, resampled_labels = sampler.fit_resample(np.array(train_indices).reshape(-1, 1), np.array(train_labels))
     resampled_indices = resampled_indices.flatten().tolist()
@@ -285,6 +285,8 @@ for version in version_list:
     print("Resampled label distribution:", resampled_label_counts)
 
 
+    normalized_weights = torch.tensor([0.4, 1.0])
+    loss_fn = nn.CrossEntropyLoss(weight=normalized_weights.to(device))
     #Disable reweighting for now
     # # Calculate Class Weights
     # class_weights = torch.tensor([1.0 / count for count in label_counts.values()], dtype=torch.float)
@@ -293,8 +295,6 @@ for version in version_list:
     # min_weight = min(class_weights)
     # geom_mean = (max_weight*min_weight)**0.5 #min was bad, max was bad, trying geometric mean
     # normalized_weights = class_weights / geom_mean 
-    normalized_weights = torch.tensor([0.2, 1.0])
-    loss_fn = nn.CrossEntropyLoss(weight=normalized_weights.to(device))
     
     # Initialize Model, Print Initial Weights
     model = BertClassifier(version, num_labels=2).to(device) # Initialize before weights
