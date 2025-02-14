@@ -5,7 +5,7 @@ from torch.utils.data import random_split
 vocab_file_dir = 'vocab.txt'
 raw_file_dir = 'BERT_pretrain.txt'
 
-tokenizer = BertTokenizer.from_pretrained('colaguo/bottleneckBERT')
+tokenizer = BertTokenizer.from_pretrained('pborchert/BusinessBERT')
 
 # sentence = 'Collin is working on business bottlenecks'
 # encoded_input = tokenizer.tokenize(sentence)
@@ -57,7 +57,7 @@ from transformers import Trainer, TrainingArguments, EarlyStoppingCallback, Inte
 training_args = TrainingArguments(
     output_dir='/working/',
     overwrite_output_dir=True,
-    num_train_epochs=10,
+    num_train_epochs=50,
     per_device_train_batch_size=32,
     evaluation_strategy = IntervalStrategy.STEPS,
     eval_steps = 50, # Evaluation and Save happens every 50 steps
@@ -68,7 +68,8 @@ training_args = TrainingArguments(
     weight_decay=0.01,
     push_to_hub=True,
     load_best_model_at_end=True,
-    
+    metric_for_best_model='eval_loss', # Specify the metric for early stopping.  Important!
+    greater_is_better=False, # False for loss, True for accuracy/F1 etc.  Important!
 )
 
 trainer = Trainer(
@@ -77,8 +78,9 @@ trainer = Trainer(
     data_collator=data_collator,
     train_dataset=train_dataset, # Use the training dataset
     eval_dataset=eval_dataset,   # Add the evaluation dataset
+    callbacks = [EarlyStoppingCallback(early_stopping_patience=5, early_stopping_threshold=0.0001)] # added early stopping
 )
 
 
 trainer.train()
-trainer.save_model('/working/')
+trainer.save_model('/bottleneckBERT/')

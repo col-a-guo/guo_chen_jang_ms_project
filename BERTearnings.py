@@ -95,11 +95,11 @@ class BertClassifier(nn.Module):
         )
 
         self.cls_head = nn.Sequential(
-            nn.Linear(self.bert.config.hidden_size, 128),
+            nn.Linear(self.bert.config.hidden_size, 64),
             nn.ReLU()
         )
 
-        self.final_classifier = nn.Linear(128 + 8, num_labels)
+        self.final_classifier = nn.Linear(64 + 8, num_labels)
         # more or less linear layers
         # linear 128 -> num_labels
 
