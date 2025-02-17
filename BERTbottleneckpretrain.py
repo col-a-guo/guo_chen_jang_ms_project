@@ -38,7 +38,7 @@ from transformers import BertConfig, BertForMaskedLM, DataCollatorForLanguageMod
 
 config = BertConfig(
     vocab_size=50000,
-    hidden_size=768, 
+    hidden_size=768,
     num_hidden_layers=6, 
     num_attention_heads=12,
     max_position_embeddings=512
@@ -57,19 +57,19 @@ from transformers import Trainer, TrainingArguments, EarlyStoppingCallback, Inte
 training_args = TrainingArguments(
     output_dir='/working/',
     overwrite_output_dir=True,
-    num_train_epochs=50,
+    num_train_epochs=20,
     per_device_train_batch_size=32,
     evaluation_strategy = IntervalStrategy.STEPS,
     eval_steps = 50, # Evaluation and Save happens every 50 steps
     save_total_limit = 5, # Only last 5 models are saved. Older ones are deleted.
     per_device_eval_batch_size=32,
     save_steps=10_000,
-    
+    save_safetensors=False,
     weight_decay=0.01,
     push_to_hub=True,
     load_best_model_at_end=True,
-    metric_for_best_model='eval_loss', # Specify the metric for early stopping.  Important!
-    greater_is_better=False, # False for loss, True for accuracy/F1 etc.  Important!
+    metric_for_best_model='eval_loss',
+    greater_is_better=False, # False for loss, True for accuracy/F1 etc. 
 )
 
 trainer = Trainer(
@@ -83,4 +83,4 @@ trainer = Trainer(
 
 
 trainer.train()
-trainer.save_model('/bottleneckBERT/')
+trainer.save_model('/working/')
