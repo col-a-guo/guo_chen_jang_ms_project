@@ -91,7 +91,7 @@ class BertClassifier(nn.Module, PyTorchModelHubMixin):
         self.version = version  # Store the version
         
         self.linear_features = nn.Sequential(
-            nn.Linear(11, 8),
+            nn.Linear(11, 16),
             nn.ReLU()
         )
 
@@ -100,7 +100,11 @@ class BertClassifier(nn.Module, PyTorchModelHubMixin):
             nn.ReLU()
         )
 
-        self.final_classifier = nn.Linear(128 + 8, num_labels)
+        self.linear_combined_layer = nn.Sequential(
+            nn.Linear(128 + 16, 32),
+            nn.ReLU())
+        
+        self.final_classifier = nn.Linear(32, num_labels)
         # more or less linear layers
         # linear 128 -> num_labels
 
@@ -130,7 +134,9 @@ class BertClassifier(nn.Module, PyTorchModelHubMixin):
         
         combined_output = torch.cat((bert_output, linear_features_output), dim=1)
 
-        logits = self.final_classifier(combined_output)
+        linear_layer_output = self.linear_combined_layer(combined_output)
+
+        logits = self.final_classifier(linear_layer_output)
         return logits
 
 
