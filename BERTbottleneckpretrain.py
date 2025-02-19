@@ -5,7 +5,7 @@ from torch.utils.data import random_split
 vocab_file_dir = 'vocab.txt'
 raw_file_dir = 'BERT_pretrain.txt'
 
-tokenizer = BertTokenizer.from_pretrained('pborchert/BusinessBERT')
+tokenizer = BertTokenizer.from_pretrained('colaguo/bottleneckBERT')
 
 # sentence = 'Collin is working on business bottlenecks'
 # encoded_input = tokenizer.tokenize(sentence)
@@ -38,7 +38,7 @@ from transformers import BertConfig, BertForMaskedLM, DataCollatorForLanguageMod
 
 config = BertConfig(
     vocab_size=50000,
-    hidden_size=768,
+    hidden_size=768, 
     num_hidden_layers=6, 
     num_attention_heads=12,
     max_position_embeddings=512
@@ -57,19 +57,18 @@ from transformers import Trainer, TrainingArguments, EarlyStoppingCallback, Inte
 training_args = TrainingArguments(
     output_dir='/working/',
     overwrite_output_dir=True,
-    num_train_epochs=20,
+    num_train_epochs=30,
     per_device_train_batch_size=32,
     evaluation_strategy = IntervalStrategy.STEPS,
     eval_steps = 50, # Evaluation and Save happens every 50 steps
     save_total_limit = 5, # Only last 5 models are saved. Older ones are deleted.
     per_device_eval_batch_size=32,
     save_steps=10_000,
-    save_safetensors=False,
+    
     weight_decay=0.01,
     push_to_hub=True,
     load_best_model_at_end=True,
-    metric_for_best_model='eval_loss',
-    greater_is_better=False, # False for loss, True for accuracy/F1 etc. 
+    
 )
 
 trainer = Trainer(
@@ -78,7 +77,6 @@ trainer = Trainer(
     data_collator=data_collator,
     train_dataset=train_dataset, # Use the training dataset
     eval_dataset=eval_dataset,   # Add the evaluation dataset
-    callbacks = [EarlyStoppingCallback(early_stopping_patience=5, early_stopping_threshold=0.0001)] # added early stopping
 )
 
 

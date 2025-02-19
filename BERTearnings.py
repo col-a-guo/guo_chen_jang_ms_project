@@ -11,6 +11,7 @@ import optuna
 from sklearn.metrics import confusion_matrix, classification_report
 import random
 import numpy as np
+from huggingface_hub import PyTorchModelHubMixin
 
 seed_value = 1
 random.seed(seed_value)
@@ -74,7 +75,7 @@ Classification Report (Version: {version}, Epoch {epoch if epoch is not None els
     return f1
 
 # Define the model architecture (using global pooling for all versions)
-class BertClassifier(nn.Module):
+class BertClassifier(nn.Module, PyTorchModelHubMixin):
     def __init__(self, version, num_labels=1, freeze_bert=False):
         super(BertClassifier, self).__init__()
 
@@ -231,6 +232,9 @@ def train_and_evaluate(model, train_dataloader, val_dataloader, optimizer, sched
                 print("Early stopping triggered.")
                 break
 
+    tokenizer.push_to_hub("colaguo/my-awesome-model")
+    # push to the hub
+    model.push_to_hub("colaguo/my-awesome-model")
     return best_f1 
 
 # Optuna hyperparameter optimization
@@ -298,16 +302,6 @@ for version in version_list:
     
     # Initialize Model, Print Initial Weights
     model = BertClassifier(version, num_labels=2).to(device) # Initialize before weights
-    print(f"\n----- Initial Weights for {version} -----")
-    print("\nBERT Initial Weights:")
-    for name, param in model.bert.named_parameters():
-      if "weight" in name: # Only print weights
-        print(f"  {name}: {param.data}")
-    
-    print("\nClassification Head Initial Weights:")
-    for name, param in model.cls_head.named_parameters():
-      if "weight" in name:
-        print(f"  {name}: {param.data}")
 
     # Optuna Hyperparameter Tuning with reduced trials
     study = optuna.create_study(direction="minimize")
