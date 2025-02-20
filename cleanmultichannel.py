@@ -2,14 +2,10 @@ import os
 import pandas as pd
 import glob
 
-def generate_file_paths(base_path, year, month, extension):
-    """Generates the full file path based on the year and month."""
-    return os.path.join(base_path, str(year), f'combined_{month}_completed.{extension}')
-
-def process_csv_file(file_path, standardized_columns=None):
-    """Reads a CSV file, drops the index column, standardizes columns, and returns the DataFrame."""
+def process_excel_file(file_path, standardized_columns=None):
+    """Reads an Excel file, drops the index column, standardizes columns, and returns the DataFrame."""
     try:
-        df = pd.read_csv(file_path, index_col=None)  # Explicitly ignore index
+        df = pd.read_excel(file_path, index_col=None)  # Explicitly ignore index
 
         # Drop the 'index' column if it exists
         if 'index' in df.columns:
@@ -46,51 +42,46 @@ def get_value(row, col):
 def main():
     # Define root paths
     root_paths = [
-        r"C:\Users\r2d2go\Downloads\jangmasters\Multi_Even_Completed",
-        r"C:\Users\r2d2go\Downloads\jangmasters\Completed"
+        r"C:\Users\collinguo\Downloads\drive-download-20250220T203155Z-001",
+        r"C:\Users\collinguo\Downloads\drive-download-20250220T203335Z-001"
     ]
 
-    start_year = 2007
-    end_year = 2023
-    months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
-
-    # 2. Process and Combine CSV Files
+    # 2. Process and Combine Excel Files
     all_dataframes = []
     standardized_columns = None  # Initialize to None
 
-    for year in range(start_year, end_year + 1):
-        year_dataframes = []  # Accumulate dataframes for the current year
-        for month in months:
-            for root_path in root_paths:
-                csv_file_path = generate_file_paths(root_path, year, month, "csv")
-                # check if the file exists using glob, allowing for multiple file extensions.
-                existing_files = glob.glob(csv_file_path.replace(".csv", "*"))
-                if existing_files:
-                    df = process_csv_file(existing_files[0], standardized_columns)
-                    if df is not None:
-                        if standardized_columns is None:
-                            standardized_columns = df.columns  # get initial columns from first successful dataframe.
-                        if not df.empty:  # Check if DataFrame is empty before adding it.
-                            year_dataframes.append(df)
+    for root_path in root_paths:
+        # Search for all XLSX files within the root directory.
+        excel_files = glob.glob(os.path.join(root_path, "*.xlsx")) # This captures .xlsx files
 
-        # Check 'stage' condition for the entire year *after* all months are processed
-        if year_dataframes:  # Only proceed if we collected any data for the year
+        year_dataframes = []  # Accumulate dataframes for the current root path
+
+        for file_path in excel_files:
+            df = process_excel_file(file_path, standardized_columns)
+            if df is not None:
+                if standardized_columns is None:
+                    standardized_columns = df.columns  # get initial columns from first successful dataframe.
+                if not df.empty:  # Check if DataFrame is empty before adding it.
+                    year_dataframes.append(df)
+
+        # Check 'stage' condition for the entire root path *after* all files are processed
+        if year_dataframes:  # Only proceed if we collected any data for the root path
             try:
                 combined_year_df = pd.concat(year_dataframes, ignore_index=True)
             except Exception as e:
-                print(f"Error concatenating dataframes for year {year}: {e}")
-                continue  # Skip this year if concatenation fails
+                print(f"Error concatenating dataframes for root path {root_path}: {e}")
+                continue  # Skip this root path if concatenation fails
 
             if 'stage' in combined_year_df.columns:
                 if all(combined_year_df['stage'] == '0'):
-                    print(f"Year {year}: 'stage' column contains only '0' values across all files. Skipping this year.")
+                    print(f"Root path {root_path}: 'stage' column contains only '0' values across all files. Skipping this root path.")
                 else:
-                    all_dataframes.extend(year_dataframes)  # Add all the dataframes for the year
+                    all_dataframes.extend(year_dataframes)  # Add all the dataframes for the root path
             else:
-                # 'stage' column is missing, so add the dataframes for the year
+                # 'stage' column is missing, so add the dataframes for the root path
                 all_dataframes.extend(year_dataframes)
         else:
-            print(f"No data found for year {year}, skipping.")
+            print(f"No data found for root path {root_path}, skipping.")
 
     if all_dataframes:
         try:
@@ -113,7 +104,7 @@ def main():
             print(f"Shape of merged dataframe: {combined_df.shape}")
 
             # OPTIONAL: Save to CSV
-            output_path = r"C:\Users\r2d2go\Downloads\jangmasters\guo_chen_jang_ms_project\feb_6_multichannel_combined.csv"
+            output_path = "feb_20_multichannel_combined.csv"  # Just the filename
             combined_df.to_csv(output_path, index=False)
             print(f"Data saved to: {output_path}")
         except Exception as e:
