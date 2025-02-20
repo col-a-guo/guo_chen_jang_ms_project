@@ -25,7 +25,7 @@ print(f"Using device: {device}")
 version_list = ["bert-uncased", "businessBERT", "colaguo-working"]  # Updated version list
 
 # Default hyperparameters for Optuna
-default_lr = 5.841204543279205e-05
+default_lr = 1.841204543279205e-04
 default_eps = 6.748313060587885e-08
 default_batch_size = 32
 
@@ -153,7 +153,7 @@ def load_tokenizer(version):
         raise ValueError(f"Invalid model version: {version}")
 
 # Load dataset and preprocess
-ogpath = "feb_6_stitched.csv"
+ogpath = "feb_20_stitched.csv"
 dataset = load_dataset('csv', data_files={'train': "train_" + ogpath, 'test': "test_" + ogpath})
 
 # Truncate dataset; useful to avoid resampling errors due to requesting more samples than exist
@@ -285,7 +285,7 @@ for version in version_list:
     min_count = min(label_counts.values())
     
     # Apply undersampling to the training data
-    sampler = RandomUnderSampler(sampling_strategy={0: min_count*3, 1: min_count}) #3200:400
+    sampler = RandomUnderSampler(sampling_strategy={0:int(round(min_count*1.4)), 1: min_count}) #3200:400
     train_indices = list(range(len(train_labels)))
     resampled_indices, resampled_labels = sampler.fit_resample(np.array(train_indices).reshape(-1, 1), np.array(train_labels))
     resampled_indices = resampled_indices.flatten().tolist()
@@ -295,7 +295,7 @@ for version in version_list:
     print("Resampled label distribution:", resampled_label_counts)
 
 
-    normalized_weights = torch.tensor([0.4, 1.0])
+    normalized_weights = torch.tensor([1.0, 1.0])
     loss_fn = nn.CrossEntropyLoss(weight=normalized_weights.to(device))
     #Disable reweighting for now
     # # Calculate Class Weights

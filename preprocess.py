@@ -86,5 +86,5 @@ data.to_csv("feb_20_combined.csv", index=False)
 train_df, test_df = train_test_split(data, test_size=0.2, random_state=1, stratify=data['label'])
 
 # # Save the train and test datasets
-# train_df.to_csv("train_combined.csv", index=False)
-# test_df.to_csv("test_combined.csv", index=False)
+train_df.to_csv("train_feb_20_stitched.csv", index=False)
+test_df.to_csv("test_feb_20_stitched.csv", index=False)
