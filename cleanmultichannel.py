@@ -14,6 +14,14 @@ def process_excel_file(file_path, standardized_columns=None):
         df.columns = df.columns.str.replace('_', ' ')
         df.columns = df.columns.str.strip().str.lower()
 
+        # Standardize bottlist-related columns
+        bottlist_variations = ["bottlist", "bott list", "bott_list"]
+        for variation in bottlist_variations:
+            if variation in df.columns:
+                df["bottlist"] = df[variation]  # Map all variations to "bottlist"
+                break  # Stop after finding and mapping the first one
+        
+
         if standardized_columns is not None:
             for col in standardized_columns:
                 if col not in df.columns:

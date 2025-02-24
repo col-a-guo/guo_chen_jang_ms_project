@@ -55,6 +55,7 @@ columns_to_keep = [
         "demand",
         "paragraph", #Special
         "label", #Y
+        "bottid"
         #"source", "length_approx", "singlebott" #Control/utility
 ]
 data = data[columns_to_keep].fillna(0)
