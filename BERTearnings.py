@@ -78,7 +78,7 @@ Classification Report (Version: {version}, Epoch {epoch if epoch is not None els
 
 # Define the model architecture (using global pooling for all versions)
 class BertClassifier(nn.Module, PyTorchModelHubMixin):
-    def __init__(self, version, num_labels=1, freeze_bert=False, num_bottid_categories=29): # Added num_bottid_categories
+    def __init__(self, version, num_labels=1, freeze_bert=False, num_bottid_categories=10): # Modified num_bottid_categories to 10
         super(BertClassifier, self).__init__()
 
         if version == "bert-uncased":
@@ -113,8 +113,6 @@ class BertClassifier(nn.Module, PyTorchModelHubMixin):
             nn.ReLU())
         
         self.final_classifier = nn.Linear(32, num_labels)
-        # more or less linear layers
-        # linear 128 -> num_labels
 
         self.pooling = nn.AdaptiveAvgPool1d(1) # Global average pooling layer
 
@@ -122,13 +120,6 @@ class BertClassifier(nn.Module, PyTorchModelHubMixin):
         if freeze_bert:
             for param in self.bert.parameters():
                 param.requires_grad = False
-
-    #TODO: Add bottleneck features here
-                #feedforward, sequential, 11 -> 8 -> num_labels, concatenate with pooled
-                #try simple concatenate, then try lower weight/layer down to 128, 64, etc
-                #try business, our bert, hybridization, ??
-                #focus on / find tokens with captum?
-                #check library for past reports maybe
                 
     def forward(self, input_ids, attention_mask, features, bottid_encoded): # Take bottid as input
         outputs = self.bert(input_ids=input_ids, attention_mask=attention_mask)
@@ -171,6 +162,9 @@ dataset = load_dataset('csv', data_files={'train': "train_" + ogpath, 'test': "t
 train_df = pd.read_csv("train_" + ogpath)
 test_df = pd.read_csv("test_" + ogpath)
 
+# Define the bottids to keep
+selected_bottids = [2, 5, 7, 12, 14, 15, 17, 18, 20, 29]
+
 #One-Hot-Encode the bottid features
 encoder = OneHotEncoder(handle_unknown='ignore')
 
@@ -179,10 +173,25 @@ encoder.fit(train_df[['bottid']])
 train_encoded = encoder.transform(train_df[['bottid']]).toarray()
 test_encoded = encoder.transform(test_df[['bottid']]).toarray()
 
-# get_feature_names_out is deprecated, use get_feature_names instead
-# but this throws an error locally and I don't want to deal with this
-# feature_names = encoder.get_feature_names_out(['bottid'])
-feature_names = [f"bottid_{i}" for i in range(train_encoded.shape[1])]
+# Filter out the non-selected bottids
+def filter_bottids(encoded_data, dataframe, selected_bottids, encoder):
+    # Create a list of all unique bottids in the dataframe
+    all_bottids = sorted(dataframe['bottid'].unique())
+
+    # Identify the indices of the selected bottids in the encoder's feature names
+    selected_indices = [all_bottids.index(bottid) for bottid in selected_bottids if bottid in all_bottids]
+
+    # Create a new array with only the selected columns
+    filtered_encoded = encoded_data[:, selected_indices]
+
+    return filtered_encoded
+
+train_encoded = filter_bottids(train_encoded, train_df, selected_bottids, encoder)
+test_encoded = filter_bottids(test_encoded, test_df, selected_bottids, encoder)
+
+
+# create feature names for the selected bottids
+feature_names = [f"bottid_{bottid}" for bottid in selected_bottids]
 
 # create a temporary dataframe to store encoded values, with feature names
 train_encoded_df = pd.DataFrame(train_encoded, columns=feature_names)
@@ -222,7 +231,7 @@ def tokenize_function(examples, tokenizer):
     return tokenizer(examples["paragraph"], padding="max_length", truncation=True, max_length=512)
 
 class CustomDataset(Dataset):
-    def __init__(self, dataset, bottid_categories=29): #Added bottid_categories, 29 should be the #. of botIDs
+    def __init__(self, dataset, bottid_categories=10): #Added bottid_categories, 10 should be the #. of botIDs
         self.dataset = dataset
         self.bottid_categories = bottid_categories
 
@@ -237,7 +246,7 @@ class CustomDataset(Dataset):
         features = torch.tensor([item['scarcity'], item['nonuniform_progress'], item['performance_constraints'], item['user_heterogeneity'], item['cognitive'], item['external'], item['internal'], item['coordination'], item['transactional'], item['technical'], item['demand']], dtype=torch.float)
 
         # Extract the one-hot encoded bottid features
-        bottid_encoded = torch.tensor([item[f"bottid_{i}"] for i in range(self.bottid_categories)], dtype=torch.float)
+        bottid_encoded = torch.tensor([item[f"bottid_{bottid}"] for bottid in selected_bottids], dtype=torch.float)
 
         return input_ids, attention_mask, features, bottid_encoded, label # Returns bottid encoding, label
 
@@ -294,7 +303,7 @@ def train_and_evaluate(model, train_dataloader, val_dataloader, optimizer, sched
     return best_f1 
 
 # Optuna hyperparameter optimization
-def objective(trial, version, train_data, test_data, loss_fn, num_bottid_categories=29): #Added num_bottid_categories here
+def objective(trial, version, train_data, test_data, loss_fn, num_bottid_categories=10): #Added num_bottid_categories here
     lr = trial.suggest_loguniform("lr", default_lr, default_lr) # Use defaults
     eps = trial.suggest_loguniform("eps", default_eps, default_eps) # Use defaults
     batch_size = trial.suggest_categorical("batch_size", [16, 32]) # Use defaults
@@ -323,7 +332,7 @@ for version in version_list:
     train_dataset = tokenized_datasets["train"]
     test_dataset = tokenized_datasets["test"]
 
-    num_bottid_categories = train_encoded.shape[1] #Determine the number of bottid categories
+    num_bottid_categories = len(selected_bottids) #Determine the number of bottid categories
     train_data = CustomDataset(train_dataset, bottid_categories=num_bottid_categories) # pass to CustomDataset
     test_data = CustomDataset(test_dataset, bottid_categories=num_bottid_categories) # pass to CustomDataset
 
@@ -348,14 +357,6 @@ for version in version_list:
 
     normalized_weights = torch.tensor([1.0, 1.0])
     loss_fn = nn.CrossEntropyLoss(weight=normalized_weights.to(device))
-    #Disable reweighting for now
-    # # Calculate Class Weights
-    # class_weights = torch.tensor([1.0 / count for count in label_counts.values()], dtype=torch.float)
-    # #weights based on maximum of 
-    # max_weight = max(class_weights)
-    # min_weight = min(class_weights)
-    # geom_mean = (max_weight*min_weight)**0.5 #min was bad, max was bad, trying geometric mean
-    # normalized_weights = class_weights / geom_mean 
     
     # Initialize Model, Print Initial Weights
     model = BertClassifier(version, num_labels=2, num_bottid_categories=num_bottid_categories).to(device) # Initialize before weights, pass num_bottid_categories here
