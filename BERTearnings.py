@@ -1,11 +1,11 @@
 import torch
 import torch.nn as nn
 from transformers import AutoTokenizer, AutoModel
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader, Dataset, Subset
 from transformers import get_scheduler
 from datasets import load_dataset
 from collections import Counter
-from imblearn.under_sampling import RandomUnderSampler
+from imblearn.over_sampling import RandomOverSampler  # Changed import
 import torchmetrics
 import optuna
 from sklearn.metrics import confusion_matrix, classification_report
@@ -91,17 +91,17 @@ class BertClassifier(nn.Module, PyTorchModelHubMixin):
         self.version = version  # Store the version
         
         self.linear_features = nn.Sequential(
-            nn.Linear(11, 16),
+            nn.Linear(11, 32),
             nn.ReLU()
         )
 
         self.cls_head = nn.Sequential(
-            nn.Linear(self.bert.config.hidden_size, 128),
+            nn.Linear(self.bert.config.hidden_size, 256),
             nn.ReLU()
         )
 
         self.linear_combined_layer = nn.Sequential(
-            nn.Linear(128 + 16, 32),
+            nn.Linear(256 + 32, 32),
             nn.ReLU())
         
         self.final_classifier = nn.Linear(32, num_labels)
@@ -159,7 +159,7 @@ dataset = load_dataset('csv', data_files={'train': "train_" + ogpath, 'test': "t
 # Truncate dataset; useful to avoid resampling errors due to requesting more samples than exist
 # also reducing to very small numbers for testing
 def truncate_dataset(dataset):
-    k = round(len(dataset)*0.97)
+    k = round(len(dataset)*0.99)
     random_indices = random.sample(range(len(dataset)), k)
     return dataset.select(random_indices)
 
@@ -192,7 +192,7 @@ class CustomDataset(Dataset):
         return input_ids, attention_mask, features, label
 
 # Training function
-def train_and_evaluate(model, train_dataloader, val_dataloader, optimizer, scheduler, epochs, loss_fn, patience=7, num_classes=3, version=None): # Changed num_classes to 3
+def train_and_evaluate(model, train_dataloader, val_dataloader, optimizer, scheduler, epochs, loss_fn, patience=4, num_classes=3, version=None): # Changed num_classes to 3
     model.to(device)
     best_f1 = 0.0  
     patience_counter = 0
@@ -254,7 +254,7 @@ def objective(trial, version, train_data, test_data, loss_fn):
     test_dataloader = DataLoader(test_data, batch_size=batch_size)
 
     model = BertClassifier(version, num_labels=3).to(device) # Changed num_labels to 3
-    optimizer = torch.optim.AdamW(model.parameters(), lr=lr, eps=eps)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=lr, eps=eps, betas=(0.95, 0.9995))
     total_steps = len(train_dataloader) * 20
     scheduler = get_scheduler("linear", optimizer=optimizer, num_warmup_steps=0, num_training_steps=total_steps)
 
@@ -276,29 +276,31 @@ for version in version_list:
     train_data = CustomDataset(train_dataset)
     test_data = CustomDataset(test_dataset)
 
-    # Undersampling to balance labels
+    # Oversampling to balance labels
     train_labels = [item['label'] for item in train_dataset]
     label_counts = Counter(train_labels)
     print("Original label distribution:", label_counts)
 
-    # Determine the minimum count of a class
-    min_count = min(label_counts.values())
-    
-    # Apply undersampling to the training data
-    # Update undersampling strategy to consider the three classes
+    # Determine the maximum count of a class
+    max_count = max(label_counts.values())
+
+    # Apply oversampling to the training data
     sampling_strategy = {}
-    for i in range(3):
+    for i in range(3):  # Iterate through all possible labels
         if i in label_counts:
-            sampling_strategy[i] = int(round(min_count * 1.4)) if i != np.argmin(list(label_counts.values())) else min_count #3200:400
+            sampling_strategy[i] = max_count  # Oversample to the maximum count
         else:
-            sampling_strategy[i] = int(round(min_count*1.4))  # Assign a value if the label doesn't exist
-    sampler = RandomUnderSampler(sampling_strategy=sampling_strategy)
+            sampling_strategy[i] = max_count  # If class not present, create enough to oversample it.
+    oversampler = RandomOverSampler(sampling_strategy=sampling_strategy)
 
     train_indices = list(range(len(train_labels)))
-    resampled_indices, resampled_labels = sampler.fit_resample(np.array(train_indices).reshape(-1, 1), np.array(train_labels))
+    resampled_indices, resampled_labels = oversampler.fit_resample(np.array(train_indices).reshape(-1, 1), np.array(train_labels))
     resampled_indices = resampled_indices.flatten().tolist()
-    
-    resampled_train_data = torch.utils.data.Subset(train_data, resampled_indices)
+
+    # Create resampled Subset
+    resampled_train_data = Subset(train_data, resampled_indices)
+
+
     resampled_label_counts = Counter(resampled_labels)
     print("Resampled label distribution:", resampled_label_counts)
 
@@ -306,14 +308,6 @@ for version in version_list:
     # Adjust normalized weights to account for 3 labels
     normalized_weights = torch.tensor([1.0, 1.0, 1.0]) # set all weights to 1 initially
     loss_fn = nn.CrossEntropyLoss(weight=normalized_weights.to(device))
-    #Disable reweighting for now
-    # # Calculate Class Weights
-    # class_weights = torch.tensor([1.0 / count for count in label_counts.values()], dtype=torch.float)
-    # #weights based on maximum of 
-    # max_weight = max(class_weights)
-    # min_weight = min(class_weights)
-    # geom_mean = (max_weight*min_weight)**0.5 #min was bad, max was bad, trying geometric mean
-    # normalized_weights = class_weights / geom_mean 
     
     # Initialize Model, Print Initial Weights
     model = BertClassifier(version, num_labels=3).to(device) # Initialize before weights
@@ -329,5 +323,5 @@ for version in version_list:
     test_dataloader = DataLoader(test_data, batch_size=study.best_params['batch_size'])
     optimizer = torch.optim.AdamW(model.parameters(), lr=study.best_params['lr'], eps=study.best_params['eps'])
     scheduler = get_scheduler("linear", optimizer=optimizer, num_warmup_steps=0, num_training_steps=len(train_dataloader) * 10)
-    train_and_evaluate(model, train_dataloader, test_dataloader, optimizer, scheduler, epochs=20, loss_fn=loss_fn, num_classes=3, version=version) # Changed num_classes to 3
+    train_and_evaluate(model, train_dataloader, test_dataloader, optimizer, scheduler, epochs=40, loss_fn=loss_fn, num_classes=3, version=version) # Changed num_classes to 3
     generate_classification_report(model, test_dataloader, num_classes=3, version=version) # Changed num_classes to 3
