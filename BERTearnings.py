@@ -25,7 +25,7 @@ print(f"Using device: {device}")
 version_list = ["colaguo-working","businessBERT",  "bert-uncased"]  # Updated version list
 
 # Default hyperparameters for Optuna
-default_lr = 3.841204543279205e-05
+default_lr = 1.141204543279205e-05
 default_eps = 6.748313060587885e-08
 default_batch_size = 32
     
@@ -76,7 +76,7 @@ Classification Report (Version: {version}, Epoch {epoch if epoch is not None els
 
 # Define the model architecture (using global pooling for all versions)
 class BertClassifier(nn.Module, PyTorchModelHubMixin):
-    def __init__(self, version, num_labels=3, freeze_bert=False): # Changed num_labels to 3
+    def __init__(self, version, num_labels=3, freeze_bert=False, dropout_rate=0.1): # Changed num_labels to 3 and added dropout_rate
         super(BertClassifier, self).__init__()
 
         if version == "bert-uncased":
@@ -89,20 +89,25 @@ class BertClassifier(nn.Module, PyTorchModelHubMixin):
            raise ValueError(f"Invalid model version: {version}")
         
         self.version = version  # Store the version
+        self.dropout_rate = dropout_rate  # Store the dropout rate
         
         self.linear_features = nn.Sequential(
             nn.Linear(11, 32),
-            nn.ReLU()
+            nn.ReLU(),
+            nn.Dropout(dropout_rate) # Added dropout
         )
 
         self.cls_head = nn.Sequential(
             nn.Linear(self.bert.config.hidden_size, 256),
-            nn.ReLU()
+            nn.ReLU(),
+            nn.Dropout(dropout_rate) # Added dropout
         )
 
         self.linear_combined_layer = nn.Sequential(
             nn.Linear(256 + 32, 32),
-            nn.ReLU())
+            nn.ReLU(),
+            nn.Dropout(dropout_rate) # Added dropout
+            )
         
         self.final_classifier = nn.Linear(32, num_labels)
         # more or less linear layers
@@ -192,7 +197,7 @@ class CustomDataset(Dataset):
         return input_ids, attention_mask, features, label
 
 # Training function
-def train_and_evaluate(model, train_dataloader, val_dataloader, optimizer, scheduler, epochs, loss_fn, patience=4, num_classes=3, version=None): # Changed num_classes to 3
+def train_and_evaluate(model, train_dataloader, val_dataloader, optimizer, scheduler, epochs, loss_fn, patience=5, num_classes=3, version=None): # Changed num_classes to 3
     model.to(device)
     best_f1 = 0.0  
     patience_counter = 0
@@ -248,19 +253,19 @@ def objective(trial, version, train_data, test_data, loss_fn):
     lr = trial.suggest_loguniform("lr", default_lr, default_lr) # Use defaults
     eps = trial.suggest_loguniform("eps", default_eps, default_eps) # Use defaults
     batch_size = trial.suggest_categorical("batch_size", [16, 32]) # Use defaults
-
+    dropout_rate = trial.suggest_float("dropout_rate", 0.0, 0.5)  # Added dropout rate
 
     train_dataloader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
     test_dataloader = DataLoader(test_data, batch_size=batch_size)
 
-    model = BertClassifier(version, num_labels=3).to(device) # Changed num_labels to 3
+    model = BertClassifier(version, num_labels=3, dropout_rate=dropout_rate).to(device) # Changed num_labels to 3 and added dropout_rate
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr, eps=eps, betas=(0.95, 0.9995))
     total_steps = len(train_dataloader) * 20
     scheduler = get_scheduler("linear", optimizer=optimizer, num_warmup_steps=0, num_training_steps=total_steps)
 
     val_f1 = train_and_evaluate(model, train_dataloader, test_dataloader, optimizer, scheduler, epochs=20, loss_fn=loss_fn, version=version)
     with open("classification_report.txt", "a") as f:
-        f.write(f"Run Parameters for {version}:\n lr: {lr}, eps: {eps}, batch_size: {batch_size}\n\n")
+        f.write(f"Run Parameters for {version}:\n lr: {lr}, eps: {eps}, batch_size: {batch_size}, dropout_rate: {dropout_rate}\n\n")
     return -val_f1 # Optuna minimizes, we want to maximize F1 so return negative F1
 
 
@@ -306,7 +311,7 @@ for version in version_list:
 
 
     # Adjust normalized weights to account for 3 labels
-    normalized_weights = torch.tensor([1.0, 1.0, 1.0]) # set all weights to 1 initially
+    normalized_weights = torch.tensor([1.0, 1.0, 2.0]) # set all weights to 1 initially
     loss_fn = nn.CrossEntropyLoss(weight=normalized_weights.to(device))
     
     # Initialize Model, Print Initial Weights
@@ -318,7 +323,7 @@ for version in version_list:
     print("Best hyperparameters:", study.best_params)
 
     # Final evaluation
-    model = BertClassifier(version, num_labels=3).to(device)  # Update num_labels to match dataset
+    model = BertClassifier(version, num_labels=3, dropout_rate=study.best_params['dropout_rate']).to(device)  # Update num_labels to match dataset and add dropout
     train_dataloader = DataLoader(resampled_train_data, batch_size=study.best_params['batch_size'], shuffle=True)
     test_dataloader = DataLoader(test_data, batch_size=study.best_params['batch_size'])
     optimizer = torch.optim.AdamW(model.parameters(), lr=study.best_params['lr'], eps=study.best_params['eps'])
