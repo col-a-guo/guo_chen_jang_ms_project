@@ -1,8 +1,9 @@
 import os
 import pandas as pd
 import glob
+import numpy as np  # Import numpy for NaN
 
-def process_excel_file(file_path, standardized_columns=None):
+def process_excel_file(file_path, standardized_columns):
     """Reads an Excel file, drops the index column, standardizes columns, and returns the DataFrame."""
     try:
         df = pd.read_excel(file_path, index_col=None)  # Explicitly ignore index
@@ -14,19 +15,50 @@ def process_excel_file(file_path, standardized_columns=None):
         df.columns = df.columns.str.replace('_', ' ')
         df.columns = df.columns.str.strip().str.lower()
 
-        # Standardize bottlist-related columns
-        bottlist_variations = ["bottlist", "bott list", "bott_list"]
-        for variation in bottlist_variations:
-            if variation in df.columns:
-                df["bottlist"] = df[variation]  # Map all variations to "bottlist"
-                break  # Stop after finding and mapping the first one
-        
+        # Remove duplicate "substitutional partners" column if it exists.
+        if 'substitutional partners' in df.columns and df.columns.tolist().count('substitutional partners') > 1:
+            cols = df.columns.tolist()
+            first_occurrence = cols.index('substitutional partners')
+            # Drop all after the first.
+            for i in range(len(cols)-1, first_occurrence, -1):
+              if cols[i] == 'substitutional partners':
+                df = df.drop(cols[i], axis=1)
 
-        if standardized_columns is not None:
-            for col in standardized_columns:
-                if col not in df.columns:
-                    df[col] = None
-            df = df[standardized_columns]
+
+        # Specific handling for 2020-2023 data
+        # Mapping of old column names to standardized column names
+        column_mapping = {
+            'year-month': 'year',
+            'article_title': 'article name',
+            'length_of_article': 'length of article',  # Corrected to standardized name
+            'data_center/storage': 'data center/storage', # Corrected to standardized name
+            'internet_infra': 'internet infra', # Corrected to standardized name
+            'content_distribution': 'content distribution',# Corrected to standardized name
+            'browsers,_apps_&_smart_devices': 'browsers, apps & smart devices', # Corrected to standardized name
+            # REMOVE VERSION FROM ALL DATA.
+        }
+
+        # Rename columns based on the mapping
+        df = df.rename(columns=column_mapping)
+
+        # Ensure 'year' column contains just the year (extract from date if needed)
+        if 'year' in df.columns:
+            try:
+                df['year'] = pd.to_datetime(df['year']).dt.year.astype(str)
+            except:
+                df['year'] = df['year'].astype(str)
+
+        # Replace '#NAME?' with NaN
+        df = df.replace('#name?', np.nan, regex=True)
+
+        # Add missing columns
+        for col in standardized_columns:
+            if col not in df.columns:
+                df[col] = None
+
+        # Select only the standardized columns, in the correct order.
+        df = df[standardized_columns]
+
 
         # Make all columns into strings to avoid dtype problems
         for col in df.columns:
@@ -50,76 +82,49 @@ def get_value(row, col):
 def main():
     # Define root paths
     root_paths = [
-        r"C:\Users\collinguo\Downloads\drive-download-20250220T203155Z-001",
-        r"C:\Users\collinguo\Downloads\drive-download-20250220T203335Z-001"
+        r"C:\Users\collinguo\Downloads\drive-download-20250224T225051Z-001",
+        r"C:\Users\collinguo\Downloads\drive-download-20250224T225749Z-001"
+    ]
+
+    # Define standardized columns
+    standardized_columns = [
+        "stage",  # Move 'stage' to the beginning
+        "year", "page", "article name", "length of article", "paragraph",
+        "2500bott", "bottid", "singlebott", "scarcity",
+        "nonuniform progress", "performance constraints", "user heterogeneity", "cognitive",
+        "external", "internal", "coordination", "transactional", "technical", "demand",
+        "2500partner", "singlepartner", "content production", "data center/storage",
+        "internet infra", "content distribution", "browsers, apps & smart devices",
+        "advertising", "end users", "external partners", "substitutional partners"
     ]
 
     # 2. Process and Combine Excel Files
     all_dataframes = []
-    standardized_columns = None  # Initialize to None
+    output_path = "feb_24_multichannel_combined.csv"  # Just the filename
+
+    # Write header to CSV file only once at the beginning
+    pd.DataFrame(columns=standardized_columns).to_csv(output_path, index=False)
 
     for root_path in root_paths:
         # Search for all XLSX files within the root directory.
-        excel_files = glob.glob(os.path.join(root_path, "*.xlsx")) # This captures .xlsx files
-
-        year_dataframes = []  # Accumulate dataframes for the current root path
+        excel_files = glob.glob(os.path.join(root_path, "*/*.xlsx")) # This captures .xlsx files
 
         for file_path in excel_files:
+            print(f"Processing file: {file_path}")
             df = process_excel_file(file_path, standardized_columns)
             if df is not None:
-                if standardized_columns is None:
-                    standardized_columns = df.columns  # get initial columns from first successful dataframe.
                 if not df.empty:  # Check if DataFrame is empty before adding it.
-                    year_dataframes.append(df)
 
-        # Check 'stage' condition for the entire root path *after* all files are processed
-        if year_dataframes:  # Only proceed if we collected any data for the root path
-            try:
-                combined_year_df = pd.concat(year_dataframes, ignore_index=True)
-            except Exception as e:
-                print(f"Error concatenating dataframes for root path {root_path}: {e}")
-                continue  # Skip this root path if concatenation fails
+                    # Save the DataFrame to the output file
+                    try:
+                        df.to_csv(output_path, mode='a', header=False, index=False)  # Append without header
+                        print(f"Successfully appended data from {file_path} to: {output_path}")
 
-            if 'stage' in combined_year_df.columns:
-                if all(combined_year_df['stage'] == '0'):
-                    print(f"Root path {root_path}: 'stage' column contains only '0' values across all files. Skipping this root path.")
-                else:
-                    all_dataframes.extend(year_dataframes)  # Add all the dataframes for the root path
-            else:
-                # 'stage' column is missing, so add the dataframes for the root path
-                all_dataframes.extend(year_dataframes)
-        else:
-            print(f"No data found for root path {root_path}, skipping.")
+                    except Exception as e:
+                        print(f"Error during appending data from {file_path} to CSV")
+                        print(f"Error details: {e}")
 
-    if all_dataframes:
-        try:
-            # combine dataframes into a dictionary of lists.
-            combined_dict = {}
-
-            # initialize all keys in the combined dictionary:
-            for col in standardized_columns:
-                combined_dict[col] = []
-
-            # populate the values of each column
-            for df in all_dataframes:
-                for _, row in df.iterrows():
-                    for col in standardized_columns:
-                        combined_dict[col].append(get_value(row, col))
-
-            combined_df = pd.DataFrame(combined_dict)
-
-            print("Data merged successfully.")
-            print(f"Shape of merged dataframe: {combined_df.shape}")
-
-            # OPTIONAL: Save to CSV
-            output_path = "feb_20_multichannel_combined.csv"  # Just the filename
-            combined_df.to_csv(output_path, index=False)
-            print(f"Data saved to: {output_path}")
-        except Exception as e:
-            print(f"Error During Concatenation: {e}")
-
-    else:
-        print("No data files were found and merged.")
+    print("Finished processing all files.")
 
 if __name__ == "__main__":
     main()

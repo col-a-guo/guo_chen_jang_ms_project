@@ -12,8 +12,6 @@ from sklearn.metrics import confusion_matrix, classification_report
 import random
 import numpy as np
 from huggingface_hub import PyTorchModelHubMixin
-import pandas as pd
-from sklearn.preprocessing import OneHotEncoder
 
 seed_value = 1
 random.seed(seed_value)
@@ -24,13 +22,13 @@ torch.cuda.manual_seed_all(seed_value)  # If using CUDA
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 
-version_list = ["colaguo-working", "bert-uncased", "businessBERT"]  # Updated version list
+version_list = ["colaguo-working","businessBERT",  "bert-uncased"]  # Updated version list
 
 # Default hyperparameters for Optuna
-default_lr = 3.141204543279205e-05
+default_lr = 3.841204543279205e-05
 default_eps = 6.748313060587885e-08
 default_batch_size = 32
-
+    
 # Function to generate classification report for multi-class
 def generate_classification_report(model, dataloader, num_classes, epoch=None, version=None):
     model.eval()
@@ -38,8 +36,8 @@ def generate_classification_report(model, dataloader, num_classes, epoch=None, v
     all_labels = []
     with torch.no_grad():
         for batch in dataloader:
-            input_ids, attention_mask, features, bottid_encoded, labels = [t.to(device) for t in batch] #Unpack bottid
-            logits = model(input_ids, attention_mask, features, bottid_encoded) # Pass bottid to model
+            input_ids, attention_mask, features, labels = [t.to(device) for t in batch]
+            logits = model(input_ids, attention_mask, features)
             preds = torch.argmax(logits, dim=1)  # Multi-class prediction
             all_preds.extend(preds.cpu().numpy())
             all_labels.extend(labels.cpu().numpy())
@@ -78,7 +76,7 @@ Classification Report (Version: {version}, Epoch {epoch if epoch is not None els
 
 # Define the model architecture (using global pooling for all versions)
 class BertClassifier(nn.Module, PyTorchModelHubMixin):
-    def __init__(self, version, num_labels=1, freeze_bert=False, num_bottid_categories=10): # Modified num_bottid_categories to 10
+    def __init__(self, version, num_labels=3, freeze_bert=False): # Changed num_labels to 3
         super(BertClassifier, self).__init__()
 
         if version == "bert-uncased":
@@ -97,22 +95,18 @@ class BertClassifier(nn.Module, PyTorchModelHubMixin):
             nn.ReLU()
         )
 
-        self.linear_bottid = nn.Sequential(
-            nn.Linear(num_bottid_categories, 8),  # Linear layer for bottid encoding
-            nn.ReLU()
-        )
-
-
         self.cls_head = nn.Sequential(
             nn.Linear(self.bert.config.hidden_size, 128),
             nn.ReLU()
         )
 
         self.linear_combined_layer = nn.Sequential(
-            nn.Linear(128 + 16 + 8, 32), #Concatenate additional features here
+            nn.Linear(128 + 16, 32),
             nn.ReLU())
         
         self.final_classifier = nn.Linear(32, num_labels)
+        # more or less linear layers
+        # linear 128 -> num_labels
 
         self.pooling = nn.AdaptiveAvgPool1d(1) # Global average pooling layer
 
@@ -120,8 +114,15 @@ class BertClassifier(nn.Module, PyTorchModelHubMixin):
         if freeze_bert:
             for param in self.bert.parameters():
                 param.requires_grad = False
+
+    #TODO: Add bottleneck features here
+                #feedforward, sequential, 11 -> 8 -> num_labels, concatenate with pooled
+                #try simple concatenate, then try lower weight/layer down to 128, 64, etc
+                #try business, our bert, hybridization, ??
+                #focus on / find tokens with captum?
+                #check library for past reports maybe
                 
-    def forward(self, input_ids, attention_mask, features, bottid_encoded): # Take bottid as input
+    def forward(self, input_ids, attention_mask, features):
         outputs = self.bert(input_ids=input_ids, attention_mask=attention_mask)
         # Global average pooling
         last_hidden_state = outputs.last_hidden_state
@@ -130,11 +131,8 @@ class BertClassifier(nn.Module, PyTorchModelHubMixin):
         bert_output = self.cls_head(pooled_output)
 
         linear_features_output = self.linear_features(features)
-        bottid_output = self.linear_bottid(bottid_encoded) # Pass bottid through linear layer
-
-
-        combined_output = torch.cat((bert_output, linear_features_output, bottid_output), dim=1) #Concatenate bottid
-
+        
+        combined_output = torch.cat((bert_output, linear_features_output), dim=1)
 
         linear_layer_output = self.linear_combined_layer(combined_output)
 
@@ -155,60 +153,8 @@ def load_tokenizer(version):
         raise ValueError(f"Invalid model version: {version}")
 
 # Load dataset and preprocess
-ogpath = "feb_20_stitched.csv"
+ogpath = "feb_24_combined.csv"
 dataset = load_dataset('csv', data_files={'train': "train_" + ogpath, 'test': "test_" + ogpath})
-
-# Load the CSVs into pandas to encode bottid correctly, then pass back into the HF dataset.
-train_df = pd.read_csv("train_" + ogpath)
-test_df = pd.read_csv("test_" + ogpath)
-
-# Define the bottids to keep
-selected_bottids = [2, 5, 7, 12, 14, 15, 17, 18, 20, 29]
-
-#One-Hot-Encode the bottid features
-encoder = OneHotEncoder(handle_unknown='ignore')
-
-encoder.fit(train_df[['bottid']])
-
-train_encoded = encoder.transform(train_df[['bottid']]).toarray()
-test_encoded = encoder.transform(test_df[['bottid']]).toarray()
-
-# Filter out the non-selected bottids
-def filter_bottids(encoded_data, dataframe, selected_bottids, encoder):
-    # Create a list of all unique bottids in the dataframe
-    all_bottids = sorted(dataframe['bottid'].unique())
-
-    # Identify the indices of the selected bottids in the encoder's feature names
-    selected_indices = [all_bottids.index(bottid) for bottid in selected_bottids if bottid in all_bottids]
-
-    # Create a new array with only the selected columns
-    filtered_encoded = encoded_data[:, selected_indices]
-
-    return filtered_encoded
-
-train_encoded = filter_bottids(train_encoded, train_df, selected_bottids, encoder)
-test_encoded = filter_bottids(test_encoded, test_df, selected_bottids, encoder)
-
-
-# create feature names for the selected bottids
-feature_names = [f"bottid_{bottid}" for bottid in selected_bottids]
-
-# create a temporary dataframe to store encoded values, with feature names
-train_encoded_df = pd.DataFrame(train_encoded, columns=feature_names)
-test_encoded_df = pd.DataFrame(test_encoded, columns=feature_names)
-
-#Concatenate new onehot-encoded columns onto original dataframe
-train_df = pd.concat([train_df, train_encoded_df], axis=1)
-test_df = pd.concat([test_df, test_encoded_df], axis=1)
-
-# Remove the original bottid column
-train_df = train_df.drop('bottid', axis=1)
-test_df = test_df.drop('bottid', axis=1)
-
-#Convert the dataframes back to HuggingFace datasets
-dataset['train'] = dataset['train'].from_pandas(train_df)
-dataset['test'] = dataset['test'].from_pandas(test_df)
-
 
 # Truncate dataset; useful to avoid resampling errors due to requesting more samples than exist
 # also reducing to very small numbers for testing
@@ -220,20 +166,19 @@ def truncate_dataset(dataset):
 dataset = {k: truncate_dataset(v) for k, v in dataset.items()}
 
 
-# Filter out label 2
-def filter_label_2(dataset):
-    filtered_dataset = dataset.filter(lambda example: example['label'] != 2)
-    return filtered_dataset
+# Removing the filter for label 2
+#def filter_label_2(dataset):
+#    filtered_dataset = dataset.filter(lambda example: example['label'] != 2)
+#    return filtered_dataset
 
-dataset = {k: filter_label_2(v) for k, v in dataset.items()}
+#dataset = {k: filter_label_2(v) for k, v in dataset.items()}
 
 def tokenize_function(examples, tokenizer):
     return tokenizer(examples["paragraph"], padding="max_length", truncation=True, max_length=512)
 
 class CustomDataset(Dataset):
-    def __init__(self, dataset, bottid_categories=10): #Added bottid_categories, 10 should be the #. of botIDs
+    def __init__(self, dataset):
         self.dataset = dataset
-        self.bottid_categories = bottid_categories
 
     def __len__(self):
         return len(self.dataset)
@@ -244,14 +189,10 @@ class CustomDataset(Dataset):
         attention_mask = torch.tensor(item['attention_mask'])
         label = torch.tensor(item['label'], dtype=torch.long)
         features = torch.tensor([item['scarcity'], item['nonuniform_progress'], item['performance_constraints'], item['user_heterogeneity'], item['cognitive'], item['external'], item['internal'], item['coordination'], item['transactional'], item['technical'], item['demand']], dtype=torch.float)
-
-        # Extract the one-hot encoded bottid features
-        bottid_encoded = torch.tensor([item[f"bottid_{bottid}"] for bottid in selected_bottids], dtype=torch.float)
-
-        return input_ids, attention_mask, features, bottid_encoded, label # Returns bottid encoding, label
+        return input_ids, attention_mask, features, label
 
 # Training function
-def train_and_evaluate(model, train_dataloader, val_dataloader, optimizer, scheduler, epochs, loss_fn, patience=7, num_classes=2, version=None):
+def train_and_evaluate(model, train_dataloader, val_dataloader, optimizer, scheduler, epochs, loss_fn, patience=7, num_classes=3, version=None): # Changed num_classes to 3
     model.to(device)
     best_f1 = 0.0  
     patience_counter = 0
@@ -260,9 +201,9 @@ def train_and_evaluate(model, train_dataloader, val_dataloader, optimizer, sched
         model.train()
         total_loss = 0
         for batch in train_dataloader:
-            input_ids, attention_mask, features, bottid_encoded, labels = [t.to(device) for t in batch] #Unpack bottid
+            input_ids, attention_mask, features, labels = [t.to(device) for t in batch]
             model.zero_grad()
-            logits = model(input_ids, attention_mask, features, bottid_encoded) #Pass bottid to model
+            logits = model(input_ids, attention_mask, features)
             loss = loss_fn(logits, labels) # Weighted CrossEntropyLoss
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
@@ -277,8 +218,8 @@ def train_and_evaluate(model, train_dataloader, val_dataloader, optimizer, sched
         val_loss = 0
         with torch.no_grad():
             for batch in val_dataloader:
-                input_ids, attention_mask, features, bottid_encoded, labels = [t.to(device) for t in batch] #Unpack bottid
-                logits = model(input_ids, attention_mask, features, bottid_encoded) #Pass bottid to model
+                input_ids, attention_mask, features, labels = [t.to(device) for t in batch]
+                logits = model(input_ids, attention_mask, features)
                 val_loss += loss_fn(logits, labels).item() # Calculate validation loss using weighted CrossEntropyLoss
 
         avg_val_loss = val_loss / len(val_dataloader)
@@ -303,7 +244,7 @@ def train_and_evaluate(model, train_dataloader, val_dataloader, optimizer, sched
     return best_f1 
 
 # Optuna hyperparameter optimization
-def objective(trial, version, train_data, test_data, loss_fn, num_bottid_categories=10): #Added num_bottid_categories here
+def objective(trial, version, train_data, test_data, loss_fn):
     lr = trial.suggest_loguniform("lr", default_lr, default_lr) # Use defaults
     eps = trial.suggest_loguniform("eps", default_eps, default_eps) # Use defaults
     batch_size = trial.suggest_categorical("batch_size", [16, 32]) # Use defaults
@@ -312,7 +253,7 @@ def objective(trial, version, train_data, test_data, loss_fn, num_bottid_categor
     train_dataloader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
     test_dataloader = DataLoader(test_data, batch_size=batch_size)
 
-    model = BertClassifier(version, num_labels=2, num_bottid_categories=num_bottid_categories).to(device) # Pass # of bottid categories here
+    model = BertClassifier(version, num_labels=3).to(device) # Changed num_labels to 3
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr, eps=eps)
     total_steps = len(train_dataloader) * 20
     scheduler = get_scheduler("linear", optimizer=optimizer, num_warmup_steps=0, num_training_steps=total_steps)
@@ -332,9 +273,8 @@ for version in version_list:
     train_dataset = tokenized_datasets["train"]
     test_dataset = tokenized_datasets["test"]
 
-    num_bottid_categories = len(selected_bottids) #Determine the number of bottid categories
-    train_data = CustomDataset(train_dataset, bottid_categories=num_bottid_categories) # pass to CustomDataset
-    test_data = CustomDataset(test_dataset, bottid_categories=num_bottid_categories) # pass to CustomDataset
+    train_data = CustomDataset(train_dataset)
+    test_data = CustomDataset(test_dataset)
 
     # Undersampling to balance labels
     train_labels = [item['label'] for item in train_dataset]
@@ -345,7 +285,15 @@ for version in version_list:
     min_count = min(label_counts.values())
     
     # Apply undersampling to the training data
-    sampler = RandomUnderSampler(sampling_strategy={0:int(round(min_count*1.4)), 1: min_count}) #3200:400
+    # Update undersampling strategy to consider the three classes
+    sampling_strategy = {}
+    for i in range(3):
+        if i in label_counts:
+            sampling_strategy[i] = int(round(min_count * 1.4)) if i != np.argmin(list(label_counts.values())) else min_count #3200:400
+        else:
+            sampling_strategy[i] = int(round(min_count*1.4))  # Assign a value if the label doesn't exist
+    sampler = RandomUnderSampler(sampling_strategy=sampling_strategy)
+
     train_indices = list(range(len(train_labels)))
     resampled_indices, resampled_labels = sampler.fit_resample(np.array(train_indices).reshape(-1, 1), np.array(train_labels))
     resampled_indices = resampled_indices.flatten().tolist()
@@ -355,22 +303,31 @@ for version in version_list:
     print("Resampled label distribution:", resampled_label_counts)
 
 
-    normalized_weights = torch.tensor([1.0, 1.0])
+    # Adjust normalized weights to account for 3 labels
+    normalized_weights = torch.tensor([1.0, 1.0, 1.0]) # set all weights to 1 initially
     loss_fn = nn.CrossEntropyLoss(weight=normalized_weights.to(device))
+    #Disable reweighting for now
+    # # Calculate Class Weights
+    # class_weights = torch.tensor([1.0 / count for count in label_counts.values()], dtype=torch.float)
+    # #weights based on maximum of 
+    # max_weight = max(class_weights)
+    # min_weight = min(class_weights)
+    # geom_mean = (max_weight*min_weight)**0.5 #min was bad, max was bad, trying geometric mean
+    # normalized_weights = class_weights / geom_mean 
     
     # Initialize Model, Print Initial Weights
-    model = BertClassifier(version, num_labels=2, num_bottid_categories=num_bottid_categories).to(device) # Initialize before weights, pass num_bottid_categories here
+    model = BertClassifier(version, num_labels=3).to(device) # Initialize before weights
 
     # Optuna Hyperparameter Tuning with reduced trials
     study = optuna.create_study(direction="minimize")
-    study.optimize(lambda trial: objective(trial, version, resampled_train_data, test_data, loss_fn, num_bottid_categories=num_bottid_categories), n_trials=2) # Reduced Trials, pass num_bottid_categories here
+    study.optimize(lambda trial: objective(trial, version, resampled_train_data, test_data, loss_fn), n_trials=2) # Reduced Trials
     print("Best hyperparameters:", study.best_params)
 
     # Final evaluation
-    model = BertClassifier(version, num_labels=2, num_bottid_categories=num_bottid_categories).to(device)  # Update num_labels to match dataset, pass num_bottid_categories here
+    model = BertClassifier(version, num_labels=3).to(device)  # Update num_labels to match dataset
     train_dataloader = DataLoader(resampled_train_data, batch_size=study.best_params['batch_size'], shuffle=True)
     test_dataloader = DataLoader(test_data, batch_size=study.best_params['batch_size'])
     optimizer = torch.optim.AdamW(model.parameters(), lr=study.best_params['lr'], eps=study.best_params['eps'])
     scheduler = get_scheduler("linear", optimizer=optimizer, num_warmup_steps=0, num_training_steps=len(train_dataloader) * 10)
-    train_and_evaluate(model, train_dataloader, test_dataloader, optimizer, scheduler, epochs=20, loss_fn=loss_fn, num_classes=2, version=version)
-    generate_classification_report(model, test_dataloader, num_classes=2, version=version)
+    train_and_evaluate(model, train_dataloader, test_dataloader, optimizer, scheduler, epochs=20, loss_fn=loss_fn, num_classes=3, version=version) # Changed num_classes to 3
+    generate_classification_report(model, test_dataloader, num_classes=3, version=version) # Changed num_classes to 3
