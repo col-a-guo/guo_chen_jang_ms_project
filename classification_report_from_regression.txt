@@ -670,3 +670,27 @@ Actual
       2   25    27    14
 
 
+
+Classification Report (from Regression, Version: colaguo-working, Epoch 8):
+
+              precision    recall  f1-score   support
+
+           0       0.49      0.79      0.60       336
+           1       0.56      0.26      0.36       354
+           2       0.20      0.17      0.18        66
+
+    accuracy                           0.49       756
+   macro avg       0.42      0.40      0.38       756
+weighted avg       0.50      0.49      0.45       756
+
+
+
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   264    51    21
+      1   238    92    24
+      2   35    20    11
+
+

@@ -1,18 +1,19 @@
 import torch
 import torch.nn as nn
 from transformers import AutoTokenizer, AutoModel
-from torch.utils.data import DataLoader, Dataset, Subset
+from torch.utils.data import DataLoader, Dataset
 from transformers import get_scheduler
 from datasets import load_dataset
 from collections import Counter
-from imblearn.over_sampling import RandomOverSampler  # Changed import
+from imblearn.under_sampling import RandomUnderSampler
 import torchmetrics
-from sklearn.metrics import mean_squared_error, r2_score, classification_report, confusion_matrix
+import optuna
+from sklearn.metrics import confusion_matrix, classification_report
 import random
 import numpy as np
 from huggingface_hub import PyTorchModelHubMixin
-import torch.nn.functional as F
 import pandas as pd
+from sklearn.preprocessing import OneHotEncoder
 
 seed_value = 1
 random.seed(seed_value)
@@ -23,75 +24,33 @@ torch.cuda.manual_seed_all(seed_value)  # If using CUDA
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 
-version_list = ["colaguo-working","businessBERT",  "bert-uncased"]  # Updated version list
+version_list = ["colaguo-working", "bert-uncased", "businessBERT"]  # Updated version list
 
-# Default hyperparameters (No Optuna anymore)
-default_lr = 1.141204543279205e-05
+# Default hyperparameters for Optuna
+default_lr = 3.141204543279205e-05
 default_eps = 6.748313060587885e-08
 default_batch_size = 32
-default_dropout_rate = 0.1  # Added default dropout
 
-# Define prediction thresholds globally
-THRESHOLD_0 = 0.7
-THRESHOLD_1 = 1.6
-
-
-# Function to generate regression report
-def generate_regression_report(model, dataloader, epoch=None, version=None):
+# Function to generate classification report for multi-class
+def generate_classification_report(model, dataloader, num_classes, epoch=None, version=None):
     model.eval()
     all_preds = []
     all_labels = []
     with torch.no_grad():
         for batch in dataloader:
-            input_ids, attention_mask, features, labels = [t.to(device) for t in batch]
-            predictions = model(input_ids, attention_mask, features).squeeze()  # Regression output
-            all_preds.extend(predictions.cpu().numpy())
+            input_ids, attention_mask, features, bottid_encoded, labels = [t.to(device) for t in batch] #Unpack bottid
+            logits = model(input_ids, attention_mask, features, bottid_encoded) # Pass bottid to model
+            preds = torch.argmax(logits, dim=1)  # Multi-class prediction
+            all_preds.extend(preds.cpu().numpy())
             all_labels.extend(labels.cpu().numpy())
 
-    all_preds = np.array(all_preds)
-    all_labels = np.array(all_labels)
-
-    mse = mean_squared_error(all_labels, all_preds)
-    r2 = r2_score(all_labels, all_preds)
-
-    report = f"""
-Regression Report (Version: {version}, Epoch {epoch if epoch is not None else 'Final'}):
-Mean Squared Error: {mse:.4f}
-R-squared: {r2:.4f}
-"""
-
-    print(report)
-    with open("regression_report.txt", "a") as f:
-        f.write(report + "\n")
-
-    return r2  # Return R-squared for early stopping
-
-
-# Function to generate classification report from regression output using custom thresholds
-def generate_classification_report_from_regression(model, dataloader, num_classes=3, epoch=None, version=None):
-    model.eval()
-    all_preds = []
-    all_labels = []
-    with torch.no_grad():
-        for batch in dataloader:
-            input_ids, attention_mask, features, labels = [t.to(device) for t in batch]
-            predictions = model(input_ids, attention_mask, features).squeeze()  # Regression output
-
-            # Apply custom thresholds
-            predicted_classes = torch.zeros_like(predictions, dtype=torch.int)
-            predicted_classes[predictions <= THRESHOLD_0] = 0
-            predicted_classes[(predictions > THRESHOLD_0) & (predictions <= THRESHOLD_1)] = 1
-            predicted_classes[predictions > THRESHOLD_1] = 2
-
-            all_preds.extend(predicted_classes.cpu().numpy())
-            all_labels.extend(labels.cpu().numpy())
-
+    # Convert to numpy arrays for sklearn functions
     all_preds = np.array(all_preds)
     all_labels = np.array(all_labels)
 
     # Generate sklearn classification report
     report = classification_report(all_labels, all_preds, target_names=[str(i) for i in range(num_classes)], zero_division=0) # Added zero_division
-
+    
     # Confusion Matrix
     cm = confusion_matrix(all_labels, all_preds, labels=list(range(num_classes)))
     cm_report = "\nConfusion Matrix:\n"
@@ -100,21 +59,27 @@ def generate_classification_report_from_regression(model, dataloader, num_classe
     cm_report += "Actual\n"
     for i, row in enumerate(cm):
         cm_report += f"      {i}   " + "    ".join(map(str, row)) + "\n"
+    
 
     final_report = f"""
-Classification Report (from Regression, Version: {version}, Epoch {epoch if epoch is not None else 'Final'}):\n
+Classification Report (Version: {version}, Epoch {epoch if epoch is not None else 'Final'}):\n
 {report}\n
 {cm_report}
 """
 
+
     print(final_report)
-    with open("classification_report_from_regression.txt", "a") as f:
+    with open("classification_report.txt", "a") as f:
         f.write(final_report + "\n")
+    
+    f1 = classification_report(all_labels, all_preds, target_names=[str(i) for i in range(num_classes)], output_dict=True, zero_division=0)['macro avg']['f1-score'] # Added zero_division
+
+    return f1
 
 # Define the model architecture (using global pooling for all versions)
-class BertRegressor(nn.Module, PyTorchModelHubMixin):  # Renamed class
-    def __init__(self, version, freeze_bert=False, dropout_rate=0.25): #  Removed num_labels, it's regression now
-        super(BertRegressor, self).__init__()
+class BertClassifier(nn.Module, PyTorchModelHubMixin):
+    def __init__(self, version, num_labels=1, freeze_bert=False, num_bottid_categories=29): # Added num_bottid_categories
+        super(BertClassifier, self).__init__()
 
         if version == "bert-uncased":
             self.bert = AutoModel.from_pretrained('google-bert/bert-base-uncased')
@@ -126,27 +91,30 @@ class BertRegressor(nn.Module, PyTorchModelHubMixin):  # Renamed class
            raise ValueError(f"Invalid model version: {version}")
         
         self.version = version  # Store the version
-        self.dropout_rate = dropout_rate  # Store the dropout rate
         
         self.linear_features = nn.Sequential(
             nn.Linear(11, 16),
-            nn.ReLU(),
-            nn.Dropout(dropout_rate) # Added dropout
+            nn.ReLU()
         )
+
+        self.linear_bottid = nn.Sequential(
+            nn.Linear(num_bottid_categories, 8),  # Linear layer for bottid encoding
+            nn.ReLU()
+        )
+
 
         self.cls_head = nn.Sequential(
             nn.Linear(self.bert.config.hidden_size, 128),
-            nn.ReLU(),
-            nn.Dropout(dropout_rate) # Added dropout
+            nn.ReLU()
         )
 
         self.linear_combined_layer = nn.Sequential(
-            nn.Linear(128 + 16, 16),
-            nn.ReLU(),
-            nn.Dropout(dropout_rate) # Added dropout
-            )
+            nn.Linear(128 + 16 + 8, 32), #Concatenate additional features here
+            nn.ReLU())
         
-        self.final_regressor = nn.Linear(16, 1)  # Output is 1 for regression
+        self.final_classifier = nn.Linear(32, num_labels)
+        # more or less linear layers
+        # linear 128 -> num_labels
 
         self.pooling = nn.AdaptiveAvgPool1d(1) # Global average pooling layer
 
@@ -155,7 +123,14 @@ class BertRegressor(nn.Module, PyTorchModelHubMixin):  # Renamed class
             for param in self.bert.parameters():
                 param.requires_grad = False
 
-    def forward(self, input_ids, attention_mask, features):
+    #TODO: Add bottleneck features here
+                #feedforward, sequential, 11 -> 8 -> num_labels, concatenate with pooled
+                #try simple concatenate, then try lower weight/layer down to 128, 64, etc
+                #try business, our bert, hybridization, ??
+                #focus on / find tokens with captum?
+                #check library for past reports maybe
+                
+    def forward(self, input_ids, attention_mask, features, bottid_encoded): # Take bottid as input
         outputs = self.bert(input_ids=input_ids, attention_mask=attention_mask)
         # Global average pooling
         last_hidden_state = outputs.last_hidden_state
@@ -164,17 +139,17 @@ class BertRegressor(nn.Module, PyTorchModelHubMixin):  # Renamed class
         bert_output = self.cls_head(pooled_output)
 
         linear_features_output = self.linear_features(features)
-        
-        combined_output = torch.cat((bert_output, linear_features_output), dim=1)
+        bottid_output = self.linear_bottid(bottid_encoded) # Pass bottid through linear layer
+
+
+        combined_output = torch.cat((bert_output, linear_features_output, bottid_output), dim=1) #Concatenate bottid
+
 
         linear_layer_output = self.linear_combined_layer(combined_output)
 
-        prediction = self.final_regressor(linear_layer_output) #No softmax or sigmoid
+        logits = self.final_classifier(linear_layer_output)
+        return logits
 
-        # Apply 2*sigmoid activation
-        prediction = 2 * torch.sigmoid(prediction)
-
-        return prediction
 
 
 # Function to load the correct tokenizer
@@ -189,25 +164,67 @@ def load_tokenizer(version):
         raise ValueError(f"Invalid model version: {version}")
 
 # Load dataset and preprocess
-ogpath = "feb_24_combined.csv"
+ogpath = "feb_20_stitched.csv"
 dataset = load_dataset('csv', data_files={'train': "train_" + ogpath, 'test': "test_" + ogpath})
+
+# Load the CSVs into pandas to encode bottid correctly, then pass back into the HF dataset.
+train_df = pd.read_csv("train_" + ogpath)
+test_df = pd.read_csv("test_" + ogpath)
+
+#One-Hot-Encode the bottid features
+encoder = OneHotEncoder(handle_unknown='ignore')
+
+encoder.fit(train_df[['bottid']])
+
+train_encoded = encoder.transform(train_df[['bottid']]).toarray()
+test_encoded = encoder.transform(test_df[['bottid']]).toarray()
+
+# get_feature_names_out is deprecated, use get_feature_names instead
+# but this throws an error locally and I don't want to deal with this
+# feature_names = encoder.get_feature_names_out(['bottid'])
+feature_names = [f"bottid_{i}" for i in range(train_encoded.shape[1])]
+
+# create a temporary dataframe to store encoded values, with feature names
+train_encoded_df = pd.DataFrame(train_encoded, columns=feature_names)
+test_encoded_df = pd.DataFrame(test_encoded, columns=feature_names)
+
+#Concatenate new onehot-encoded columns onto original dataframe
+train_df = pd.concat([train_df, train_encoded_df], axis=1)
+test_df = pd.concat([test_df, test_encoded_df], axis=1)
+
+# Remove the original bottid column
+train_df = train_df.drop('bottid', axis=1)
+test_df = test_df.drop('bottid', axis=1)
+
+#Convert the dataframes back to HuggingFace datasets
+dataset['train'] = dataset['train'].from_pandas(train_df)
+dataset['test'] = dataset['test'].from_pandas(test_df)
+
 
 # Truncate dataset; useful to avoid resampling errors due to requesting more samples than exist
 # also reducing to very small numbers for testing
 def truncate_dataset(dataset):
-    k = round(len(dataset)*0.99)
+    k = round(len(dataset)*0.97)
     random_indices = random.sample(range(len(dataset)), k)
     return dataset.select(random_indices)
 
 dataset = {k: truncate_dataset(v) for k, v in dataset.items()}
 
 
+# Filter out label 2
+def filter_label_2(dataset):
+    filtered_dataset = dataset.filter(lambda example: example['label'] != 2)
+    return filtered_dataset
+
+dataset = {k: filter_label_2(v) for k, v in dataset.items()}
+
 def tokenize_function(examples, tokenizer):
     return tokenizer(examples["paragraph"], padding="max_length", truncation=True, max_length=512)
 
 class CustomDataset(Dataset):
-    def __init__(self, dataset):
+    def __init__(self, dataset, bottid_categories=29): #Added bottid_categories, 29 should be the #. of botIDs
         self.dataset = dataset
+        self.bottid_categories = bottid_categories
 
     def __len__(self):
         return len(self.dataset)
@@ -216,25 +233,28 @@ class CustomDataset(Dataset):
         item = self.dataset[idx]
         input_ids = torch.tensor(item['input_ids'])
         attention_mask = torch.tensor(item['attention_mask'])
-        # CHANGED LABEL DTYPE TO FLOAT! IMPORTANT!
-        label = torch.tensor(item['label'], dtype=torch.float)  
+        label = torch.tensor(item['label'], dtype=torch.long)
         features = torch.tensor([item['scarcity'], item['nonuniform_progress'], item['performance_constraints'], item['user_heterogeneity'], item['cognitive'], item['external'], item['internal'], item['coordination'], item['transactional'], item['technical'], item['demand']], dtype=torch.float)
-        return input_ids, attention_mask, features, label
+
+        # Extract the one-hot encoded bottid features
+        bottid_encoded = torch.tensor([item[f"bottid_{i}"] for i in range(self.bottid_categories)], dtype=torch.float)
+
+        return input_ids, attention_mask, features, bottid_encoded, label # Returns bottid encoding, label
 
 # Training function
-def train_and_evaluate(model, train_dataloader, val_dataloader, optimizer, scheduler, epochs, loss_fn, patience=5, version=None, lr=default_lr, eps=default_eps, batch_size=default_batch_size, dropout_rate=default_dropout_rate):
+def train_and_evaluate(model, train_dataloader, val_dataloader, optimizer, scheduler, epochs, loss_fn, patience=7, num_classes=2, version=None):
     model.to(device)
-    best_r2 = -float('inf')  # Initialize with negative infinity for maximization
+    best_f1 = 0.0  
     patience_counter = 0
 
     for epoch in range(epochs):
         model.train()
         total_loss = 0
         for batch in train_dataloader:
-            input_ids, attention_mask, features, labels = [t.to(device) for t in batch]
+            input_ids, attention_mask, features, bottid_encoded, labels = [t.to(device) for t in batch] #Unpack bottid
             model.zero_grad()
-            predictions = model(input_ids, attention_mask, features).squeeze()  # Regression output
-            loss = loss_fn(predictions, labels)
+            logits = model(input_ids, attention_mask, features, bottid_encoded) #Pass bottid to model
+            loss = loss_fn(logits, labels) # Weighted CrossEntropyLoss
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             optimizer.step()
@@ -248,25 +268,20 @@ def train_and_evaluate(model, train_dataloader, val_dataloader, optimizer, sched
         val_loss = 0
         with torch.no_grad():
             for batch in val_dataloader:
-                input_ids, attention_mask, features, labels = [t.to(device) for t in batch]
-                predictions = model(input_ids, attention_mask, features).squeeze()
-                val_loss += loss_fn(predictions, labels).item()
+                input_ids, attention_mask, features, bottid_encoded, labels = [t.to(device) for t in batch] #Unpack bottid
+                logits = model(input_ids, attention_mask, features, bottid_encoded) #Pass bottid to model
+                val_loss += loss_fn(logits, labels).item() # Calculate validation loss using weighted CrossEntropyLoss
 
         avg_val_loss = val_loss / len(val_dataloader)
         print(f"Epoch {epoch + 1}/{epochs}, Training Loss: {avg_train_loss:.4f}, Validation Loss: {avg_val_loss:.4f}")
         
-        # Generate and save the regression report every epoch
-        r2_score_val = generate_regression_report(model, val_dataloader, epoch=epoch+1, version=version)
+        # Generate and save the classification report every epoch
+        f1_score = generate_classification_report(model, val_dataloader, num_classes, epoch=epoch+1, version=version)
 
-        # Generate and save the classification report from regression output every epoch
-        generate_classification_report_from_regression(model, val_dataloader, num_classes=3, epoch=epoch+1, version=version)
-
-
-        # Early stopping based on R-squared
-        if r2_score_val > best_r2:
-            best_r2 = r2_score_val
+        # Early stopping based on F1 score
+        if f1_score > best_f1:
+            best_f1 = f1_score
             patience_counter = 0
-            print(f"New best R2: {best_r2}")
         else:
             patience_counter += 1
             if patience_counter >= patience:
@@ -276,82 +291,85 @@ def train_and_evaluate(model, train_dataloader, val_dataloader, optimizer, sched
     tokenizer.push_to_hub("colaguo/my-awesome-model")
     # push to the hub
     model.push_to_hub("colaguo/my-awesome-model")
-    return best_r2
+    return best_f1 
+
+# Optuna hyperparameter optimization
+def objective(trial, version, train_data, test_data, loss_fn, num_bottid_categories=29): #Added num_bottid_categories here
+    lr = trial.suggest_loguniform("lr", default_lr, default_lr) # Use defaults
+    eps = trial.suggest_loguniform("eps", default_eps, default_eps) # Use defaults
+    batch_size = trial.suggest_categorical("batch_size", [16, 32]) # Use defaults
 
 
-# Oversampling Function
-def oversample_dataset(dataset):
-    """Oversamples the dataset to balance the occurrences of labels,
-    but only considers and oversamples 0.0, 1.0, and 2.0."""
+    train_dataloader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
+    test_dataloader = DataLoader(test_data, batch_size=batch_size)
 
-    # Convert dataset to pandas DataFrame for easier manipulation
-    df = dataset.to_pandas()
+    model = BertClassifier(version, num_labels=2, num_bottid_categories=num_bottid_categories).to(device) # Pass # of bottid categories here
+    optimizer = torch.optim.AdamW(model.parameters(), lr=lr, eps=eps)
+    total_steps = len(train_dataloader) * 20
+    scheduler = get_scheduler("linear", optimizer=optimizer, num_warmup_steps=0, num_training_steps=total_steps)
 
-    # Filter the DataFrame to include only rows where the label is 0.0, 1.0, or 2.0
-    df_filtered = df[df['label'].isin([0.0, 1.0, 2.0])]
+    val_f1 = train_and_evaluate(model, train_dataloader, test_dataloader, optimizer, scheduler, epochs=20, loss_fn=loss_fn, version=version)
+    with open("classification_report.txt", "a") as f:
+        f.write(f"Run Parameters for {version}:\n lr: {lr}, eps: {eps}, batch_size: {batch_size}\n\n")
+    return -val_f1 # Optuna minimizes, we want to maximize F1 so return negative F1
 
-    # Separate features and labels from the filtered DataFrame
-    X = df_filtered.drop('label', axis=1)
-    y = df_filtered['label']
-
-    # Initialize RandomOverSampler
-    oversampler = RandomOverSampler(sampling_strategy='auto', random_state=seed_value)
-
-    # Fit and apply oversampling to the training data
-    X_resampled, y_resampled = oversampler.fit_resample(X, y)
-
-    # Create a new DataFrame from the resampled data
-    resampled_df = pd.DataFrame(X_resampled, columns=X.columns)
-    resampled_df['label'] = y_resampled
-
-    # Concatenate the original DataFrame with the oversampled DataFrame
-    # First, exclude the filtered rows from the original DataFrame
-    df_excluded = df[~df['label'].isin([0.0, 1.0, 2.0])]
-
-    # Concatenate the excluded rows with the resampled data
-    final_df = pd.concat([df_excluded, resampled_df], ignore_index=True)
-
-    # Shuffle the DataFrame to mix the original and oversampled data
-    final_df = final_df.sample(frac=1, random_state=seed_value).reset_index(drop=True)
-
-    # Convert back to Hugging Face Dataset
-    resampled_dataset = dataset.from_pandas(final_df)
-    resampled_dataset.set_format(type=dataset.format["type"], columns=dataset.column_names)
-
-    print(f"Oversampled dataset. Original size: {len(dataset)}, New size: {len(resampled_dataset)}")
-    return resampled_dataset
 
 # Main loop
 for version in version_list:
     print(f"\n----- Running with {version} -----")
 
     tokenizer = load_tokenizer(version)
-    tokenized_datasets = {}
-    for split, data in dataset.items():
-        # APPLY OVERSAMPLING BEFORE TOKENIZATION
-        if split == "train":
-            data = oversample_dataset(data)
-
-        tokenized_datasets[split] = data.map(lambda examples: tokenize_function(examples, tokenizer), batched=True)
-
+    tokenized_datasets = {split: data.map(lambda examples: tokenize_function(examples, tokenizer), batched=True) for split, data in dataset.items()}
     train_dataset = tokenized_datasets["train"]
     test_dataset = tokenized_datasets["test"]
 
-    train_data = CustomDataset(train_dataset)
-    test_data = CustomDataset(test_dataset)
+    num_bottid_categories = train_encoded.shape[1] #Determine the number of bottid categories
+    train_data = CustomDataset(train_dataset, bottid_categories=num_bottid_categories) # pass to CustomDataset
+    test_data = CustomDataset(test_dataset, bottid_categories=num_bottid_categories) # pass to CustomDataset
 
-    #Regression benefits a lot from oversampling!
+    # Undersampling to balance labels
+    train_labels = [item['label'] for item in train_dataset]
+    label_counts = Counter(train_labels)
+    print("Original label distribution:", label_counts)
+
+    # Determine the minimum count of a class
+    min_count = min(label_counts.values())
+    
+    # Apply undersampling to the training data
+    sampler = RandomUnderSampler(sampling_strategy={0:int(round(min_count*1.4)), 1: min_count}) #3200:400
+    train_indices = list(range(len(train_labels)))
+    resampled_indices, resampled_labels = sampler.fit_resample(np.array(train_indices).reshape(-1, 1), np.array(train_labels))
+    resampled_indices = resampled_indices.flatten().tolist()
+    
+    resampled_train_data = torch.utils.data.Subset(train_data, resampled_indices)
+    resampled_label_counts = Counter(resampled_labels)
+    print("Resampled label distribution:", resampled_label_counts)
+
+
+    normalized_weights = torch.tensor([1.0, 1.0])
+    loss_fn = nn.CrossEntropyLoss(weight=normalized_weights.to(device))
+    #Disable reweighting for now
+    # # Calculate Class Weights
+    # class_weights = torch.tensor([1.0 / count for count in label_counts.values()], dtype=torch.float)
+    # #weights based on maximum of 
+    # max_weight = max(class_weights)
+    # min_weight = min(class_weights)
+    # geom_mean = (max_weight*min_weight)**0.5 #min was bad, max was bad, trying geometric mean
+    # normalized_weights = class_weights / geom_mean 
     
     # Initialize Model, Print Initial Weights
-    model = BertRegressor(version).to(device) # Initialize before weights
+    model = BertClassifier(version, num_labels=2, num_bottid_categories=num_bottid_categories).to(device) # Initialize before weights, pass num_bottid_categories here
 
-    # Training loop with default parameters
-    train_dataloader = DataLoader(train_data, batch_size=default_batch_size, shuffle=True)
-    test_dataloader = DataLoader(test_data, batch_size=default_batch_size)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=default_lr, eps=default_eps)
+    # Optuna Hyperparameter Tuning with reduced trials
+    study = optuna.create_study(direction="minimize")
+    study.optimize(lambda trial: objective(trial, version, resampled_train_data, test_data, loss_fn, num_bottid_categories=num_bottid_categories), n_trials=2) # Reduced Trials, pass num_bottid_categories here
+    print("Best hyperparameters:", study.best_params)
+
+    # Final evaluation
+    model = BertClassifier(version, num_labels=2, num_bottid_categories=num_bottid_categories).to(device)  # Update num_labels to match dataset, pass num_bottid_categories here
+    train_dataloader = DataLoader(resampled_train_data, batch_size=study.best_params['batch_size'], shuffle=True)
+    test_dataloader = DataLoader(test_data, batch_size=study.best_params['batch_size'])
+    optimizer = torch.optim.AdamW(model.parameters(), lr=study.best_params['lr'], eps=study.best_params['eps'])
     scheduler = get_scheduler("linear", optimizer=optimizer, num_warmup_steps=0, num_training_steps=len(train_dataloader) * 10)
-    loss_fn = nn.MSELoss() #Use MSE Loss
-
-    train_and_evaluate(model, train_dataloader, test_dataloader, optimizer, scheduler, epochs=40, loss_fn=loss_fn, version=version, lr=default_lr, eps=default_eps, batch_size=default_batch_size, dropout_rate=default_dropout_rate)
-    generate_regression_report(model, test_dataloader, version=version)
-    generate_classification_report_from_regression(model, test_dataloader, num_classes=3, version=version)
+    train_and_evaluate(model, train_dataloader, test_dataloader, optimizer, scheduler, epochs=20, loss_fn=loss_fn, num_classes=2, version=version)
+    generate_classification_report(model, test_dataloader, num_classes=2, version=version)

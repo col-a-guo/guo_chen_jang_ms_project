@@ -61,7 +61,9 @@ def process_stage(stage):
 
 data['label'] = data['label'].apply(process_stage)
 data = data.dropna(subset=['label']) # Drop rows where 'label' became NaN
-#data['label'] = data['label'].replace(1.5, 1) # REMOVED THIS LINE
+
+# Round the labels based on the specified conditions
+data['label'] = data['label'].apply(lambda x: 2.0 if abs(x - 1.5) < 0.1 else (1.0 if abs(x - 0.5) < 0.1 else x))
 data['label'] = data['label'].map(lambda x: f"{x:.1f}")
 
 # Columns to keep for further processing
