@@ -76,7 +76,7 @@ Classification Report (Version: {version}, Epoch {epoch if epoch is not None els
 
 # Define the model architecture (using global pooling for all versions)
 class BertClassifier(nn.Module, PyTorchModelHubMixin):
-    def __init__(self, version, num_labels=3, freeze_bert=False, dropout_rate=0.1): # Changed num_labels to 3 and added dropout_rate
+    def __init__(self, version, num_labels=3, freeze_bert=False, dropout_rate=0.25): # Changed num_labels to 3 and added dropout_rate
         super(BertClassifier, self).__init__()
 
         if version == "bert-uncased":
@@ -311,7 +311,7 @@ for version in version_list:
 
 
     # Adjust normalized weights to account for 3 labels
-    normalized_weights = torch.tensor([1.0, 1.0, 2.0]) # set all weights to 1 initially
+    normalized_weights = torch.tensor([1.0, 1.0, 1.3]) # set all weights to 1 initially
     loss_fn = nn.CrossEntropyLoss(weight=normalized_weights.to(device))
     
     # Initialize Model, Print Initial Weights
