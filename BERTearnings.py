@@ -112,9 +112,9 @@ Classification Report (from Regression, Version: {version}, Epoch {epoch if epoc
         f.write(final_report + "\n")
 
 # Define the model architecture (using global pooling for all versions)
-class BertRegressor(nn.Module, PyTorchModelHubMixin):  # Renamed class
-    def __init__(self, version, freeze_bert=False, dropout_rate=0.25): #  Removed num_labels, it's regression now
-        super(BertRegressor, self).__init__()
+class BertClassifier(nn.Module, PyTorchModelHubMixin):
+    def __init__(self, version, num_labels=3, freeze_bert=False, dropout_rate=0.1): # Changed num_labels to 3 and added dropout_rate
+        super(BertClassifier, self).__init__()
 
         if version == "bert-uncased":
             self.bert = AutoModel.from_pretrained('google-bert/bert-base-uncased')
@@ -340,7 +340,38 @@ for version in version_list:
     train_data = CustomDataset(train_dataset)
     test_data = CustomDataset(test_dataset)
 
-    #Regression benefits a lot from oversampling!
+    # Oversampling to balance labels
+    train_labels = [item['label'] for item in train_dataset]
+    label_counts = Counter(train_labels)
+    print("Original label distribution:", label_counts)
+
+    # Determine the maximum count of a class
+    max_count = max(label_counts.values())
+
+    # Apply oversampling to the training data
+    sampling_strategy = {}
+    for i in range(3):  # Iterate through all possible labels
+        if i in label_counts:
+            sampling_strategy[i] = max_count  # Oversample to the maximum count
+        else:
+            sampling_strategy[i] = max_count  # If class not present, create enough to oversample it.
+    oversampler = RandomOverSampler(sampling_strategy=sampling_strategy)
+
+    train_indices = list(range(len(train_labels)))
+    resampled_indices, resampled_labels = oversampler.fit_resample(np.array(train_indices).reshape(-1, 1), np.array(train_labels))
+    resampled_indices = resampled_indices.flatten().tolist()
+
+    # Create resampled Subset
+    resampled_train_data = Subset(train_data, resampled_indices)
+
+
+    resampled_label_counts = Counter(resampled_labels)
+    print("Resampled label distribution:", resampled_label_counts)
+
+
+    # Adjust normalized weights to account for 3 labels
+    normalized_weights = torch.tensor([1.0, 1.0, 2.0]) # set all weights to 1 initially
+    loss_fn = nn.CrossEntropyLoss(weight=normalized_weights.to(device))
     
     # Initialize Model, Print Initial Weights
     model = BertRegressor(version).to(device) # Initialize before weights
