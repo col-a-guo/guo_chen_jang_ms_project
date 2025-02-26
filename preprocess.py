@@ -44,8 +44,24 @@ data_excluding_paragraph["paragraph"] = data["paragraph"]
 # Data cleaning and preprocessing
 data = data_excluding_paragraph.dropna(subset=['stage'])
 data.rename(columns={'stage': 'label'}, inplace=True)
-data['label'] = data['label'].astype(float)
-data['label'] = data['label'].replace(1.5, 1)
+
+# Modified stage processing to handle list-like strings
+def process_stage(stage):
+    if isinstance(stage, str):
+        try:
+            # Attempt to split and convert to numbers
+            numbers = [float(x.strip()) for x in stage.split(',')]
+            return sum(numbers) / len(numbers)  # Return the average
+        except ValueError:
+            try:
+                return float(stage)
+            except ValueError:
+                return np.nan  # Return NaN if string cannot be parsed
+    return float(stage)  # If it's already a number, convert to float and return
+
+data['label'] = data['label'].apply(process_stage)
+data = data.dropna(subset=['label']) # Drop rows where 'label' became NaN
+#data['label'] = data['label'].replace(1.5, 1) # REMOVED THIS LINE
 data['label'] = data['label'].map(lambda x: f"{x:.1f}")
 
 # Columns to keep for further processing
@@ -81,11 +97,11 @@ data["number_of_types"] = data[type_columns].sum(axis=1) / 10
 print(data)
 
 # Save the combined data
-data.to_csv("feb_24_combined.csv", index=False)
+data.to_csv("feb_26_combined.csv", index=False)
 
 # Split into train and test datasets
 train_df, test_df = train_test_split(data, test_size=0.3, random_state=1)
 
 # # Save the train and test datasets
-train_df.to_csv("train_feb_24_combined.csv", index=False)
-test_df.to_csv("test_feb_24_combined.csv", index=False)
+train_df.to_csv("train_feb_26_combined.csv", index=False)
+test_df.to_csv("test_feb_26_combined.csv", index=False)
