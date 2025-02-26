@@ -138,3 +138,13 @@ Regression Report (Version: colaguo-working, Epoch 5):
 Mean Squared Error: 0.4854
 R-squared: -0.2009
 
+
+Regression Report (Version: colaguo-working, Epoch 6):
+Mean Squared Error: 0.4853
+R-squared: -0.2007
+
+
+Regression Report (Version: colaguo-working, Epoch 7):
+Mean Squared Error: 0.4874
+R-squared: -0.2059
+
