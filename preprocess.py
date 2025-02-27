@@ -63,9 +63,10 @@ data['label'] = data['label'].apply(process_stage)
 data = data.dropna(subset=['label']) # Drop rows where 'label' became NaN
 
 # Round the labels based on the specified conditions
-data['label'] = data['label'].apply(lambda x: 2.0 if abs(x - 1.5) < 0.1 else (1.0 if abs(x - 0.5) < 0.1 else x))
+data['label'] = data['label'].apply(lambda x: 1.0 if abs(x - 1.5) < 0.1 else (0.0 if abs(x - 0.5) < 0.1 else x))
 data['label'] = data['label'].map(lambda x: f"{x:.1f}")
 
+data = data[data.label != "2.0"]
 # Columns to keep for further processing
 columns_to_keep = [
         "scarcity", "nonuniform_progress", "performance_constraints", "user_heterogeneity", 
@@ -81,7 +82,6 @@ data = data[columns_to_keep].fillna(0)
 # "word_count" - Counts words by spaces in "paragraph" and winsorizes outliers
 data["word_count"] = data["paragraph"].str.count(" ") + 1
 data["word_count"] = winsorize(data["word_count"], limits=[0.05, 0.05])
-
 # "number_of_types" - Calculates the sum of the specified columns and divides by 10
 type_columns = [
     "scarcity", "nonuniform_progress", "performance_constraints",
@@ -99,11 +99,11 @@ data["number_of_types"] = data[type_columns].sum(axis=1) / 10
 print(data)
 
 # Save the combined data
-data.to_csv("feb_26_combined.csv", index=False)
+data.to_csv("feb_24_combined.csv", index=False)
 
 # Split into train and test datasets
 train_df, test_df = train_test_split(data, test_size=0.3, random_state=1)
 
 # # Save the train and test datasets
-train_df.to_csv("train_feb_26_combined.csv", index=False)
-test_df.to_csv("test_feb_26_combined.csv", index=False)
+train_df.to_csv("train_feb_24_combined.csv", index=False)
+test_df.to_csv("test_feb_24_combined.csv", index=False)
