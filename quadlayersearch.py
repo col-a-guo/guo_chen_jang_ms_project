@@ -11,158 +11,116 @@ import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.metrics import classification_report
 from sklearn.pipeline import make_pipeline
-from imblearn.over_sampling import RandomOverSampler
-from imblearn.under_sampling import RandomUnderSampler
+from sklearn.preprocessing import OneHotEncoder
 
-# Load datasets
-combined = pd.read_csv("stitched.csv")
-streaming = pd.read_csv("streaming.csv")
-multichannel = pd.read_csv("multichannel_search.csv")
+# Load dataset
+combined = pd.read_csv("feb_20_combined.csv")
 
-# Define features
+# Define features (including 'label' as it's needed before separating X and y)
 features = [
-    "transactional", "external", 
-    "coordination", "technical", "demand", "number_of_types", "word_count"]
+    "scarcity", "nonuniform_progress", "performance_constraints", "user_heterogeneity",
+    "cognitive", "external", "internal", "coordination", "transactional", "technical",
+    "demand", "label", "bottid"
+]
 
-# Prepare datasets
+# Control variables (no longer used, so kept empty)
+control_vars = []
+
+
+# Prepare dataset
 def preprocess_data(data, add_length_approx=True):
     data = data.fillna(0)
-    
     # Check if 'length_approx' exists in the dataset
     if add_length_approx:
         if "length_approx" in data.columns:
             data["length_approx"] = 0  # Set 'length_approx' column to 0 if it exists
     return data
 
-# Apply preprocessing
-combined = preprocess_data(combined, add_length_approx=False)  # Do not add length_approx in training
-streaming = preprocess_data(streaming, add_length_approx=False)
-multichannel = preprocess_data(multichannel, add_length_approx=False)
+combined = preprocess_data(combined, add_length_approx=False)
 
-# Define labels and features for the datasets
-labels = [
-    "transactional", "external", 
-    "cognitive", "scarcity", "internal"]
+# Remove rows where label is 2.0
+combined = combined[combined["label"] != 2.0]
 
-# Setup control variables
-def prepare_X_data(data, labels, control_vars):
-    X = data[labels + control_vars]
+# One-Hot Encode 'bottid'
+encoder = OneHotEncoder(handle_unknown='ignore', sparse_output=False)
+bottid_encoded = encoder.fit_transform(combined[['bottid']])
+bottid_df = pd.DataFrame(bottid_encoded, columns=encoder.get_feature_names_out(['bottid']))
+combined = pd.concat([combined.reset_index(drop=True), bottid_df], axis=1)
+combined = combined.drop('bottid', axis=1)  # Drop original 'bottid' column
+
+# Prepare data - dynamically determine the feature list after one-hot encoding
+all_features = [
+    "scarcity", "nonuniform_progress", "performance_constraints", "user_heterogeneity",
+    "cognitive", "external", "internal", "coordination", "transactional", "technical",
+    "demand"
+] + list(bottid_df.columns) # Add one-hot encoded column names
+
+# Ensure all features are present in the data; otherwise, add with default 0
+for feature in all_features:
+    if feature not in combined.columns:
+        combined[feature] = 0
+
+
+def prepare_X_data(data, all_features):
+    X = data[all_features]
     scaler = MinMaxScaler()
     return pd.DataFrame(scaler.fit_transform(X), columns=X.columns)
 
-# Control variables
-control_vars = []
 
-# Prepare data for each dataset (excluding 'length_approx' as requested)
-X_combined = prepare_X_data(combined, labels, control_vars)
-X_streaming = prepare_X_data(streaming, labels, control_vars)
-X_multichannel = prepare_X_data(multichannel, labels, control_vars)
-
-y_combined = combined["label"]
-y_streaming = streaming["label"]
-y_multichannel = multichannel["label"]
-
-# Function to apply resampling for each dataset
-def resample_data(X, y, random_state):
-    # Random OverSampling (ROS) for the training data
-    ros = RandomOverSampler(random_state=random_state)
-    X_resampled, y_resampled = ros.fit_resample(X, y)
-    
-    # Random UnderSampling (RUS) for the test data
-    label_counts = y_resampled.value_counts()
-    sampling_strategy = {label: int(count * 0.25) for label, count in label_counts.items()}
-    rus = RandomUnderSampler(sampling_strategy=sampling_strategy, random_state=random_state)
-    X_resampled, y_resampled = rus.fit_resample(X_resampled, y_resampled)
-    
-    return X_resampled, y_resampled
+X = prepare_X_data(combined, all_features) # Pass all features after one-hot encoding
+y = combined["label"]
 
 # Train-test split
-X_train_combined, X_test_combined, y_train_combined, y_test_combined = train_test_split(X_combined, y_combined, test_size=0.3, random_state=42)
-X_train_streaming, X_test_streaming, y_train_streaming, y_test_streaming = train_test_split(X_streaming, y_streaming, test_size=0.3, random_state=42)
-X_train_multichannel, X_test_multichannel, y_train_multichannel, y_test_multichannel = train_test_split(X_multichannel, y_multichannel, test_size=0.3, random_state=42)
-
-# Apply resampling to each dataset
-X_train_combined, y_train_combined = resample_data(X_train_combined, y_train_combined, random_state=42)
-X_train_streaming, y_train_streaming = resample_data(X_train_streaming, y_train_streaming, random_state=42)
-X_train_multichannel, y_train_multichannel = resample_data(X_train_multichannel, y_train_multichannel, random_state=42)
-
-X_test_combined, y_test_combined = resample_data(X_test_combined, y_test_combined, random_state=42)
-X_test_streaming, y_test_streaming = resample_data(X_test_streaming, y_test_streaming, random_state=42)
-X_test_multichannel, y_test_multichannel = resample_data(X_test_multichannel, y_test_multichannel, random_state=42)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
 
 # Define the estimator
 estimators = [('rf', RandomForestClassifier(n_estimators=10, random_state=42))]
 
 # Define Stacking Classifier
-clf = StackingClassifier(
-    estimators=estimators,
-    final_estimator=make_pipeline(
-        PolynomialFeatures(degree=2),
-        MinMaxScaler(),
-        LogisticRegression(penalty='l2', solver="saga", max_iter=10000)
-    )
-)
+# clf = StackingClassifier(
+#     estimators=estimators,
+#     final_estimator=make_pipeline(
+#         PolynomialFeatures(degree=2),
+#         MinMaxScaler(),
+#         LogisticRegression(penalty='l2', solver="saga", max_iter=10000)
+#     )
+# )
 
-# Fit the model and calculate permutation importance for each dataset
+clf = RandomForestClassifier(n_estimators=10, random_state=42)
+
+# Function to calculate permutation importance
 def calculate_permutation_importance(clf, X_train, y_train):
     clf.fit(X_train, y_train)
     result = permutation_importance(clf, X_train, y_train, n_repeats=8, random_state=42)
     return result.importances_mean
 
-# Function to print classification report for each dataset
+# Function to print classification report
 def print_classification_report(clf, X_test, y_test, dataset_name):
     y_pred = clf.predict(X_test)
     print(f"Classification Report for {dataset_name}:")
     print(classification_report(y_test, y_pred))
 
-# Fit the model for each dataset and print classification report
-clf.fit(X_train_combined, y_train_combined)
-print_classification_report(clf, X_test_combined, y_test_combined, "Combined")
-
-clf.fit(X_train_streaming, y_train_streaming)
-print_classification_report(clf, X_test_streaming, y_test_streaming, "Streaming")
-
-clf.fit(X_train_multichannel, y_train_multichannel)
-print_classification_report(clf, X_test_multichannel, y_test_multichannel, "Multichannel")
+# Train and evaluate the model
+clf.fit(X_train, y_train)
+print_classification_report(clf, X_test, y_test, "Combined")
 
 # Permutation importance
-perm_importance_combined = calculate_permutation_importance(clf, X_train_combined, y_train_combined)
-perm_importance_streaming = calculate_permutation_importance(clf, X_train_streaming, y_train_streaming)
-perm_importance_multichannel = calculate_permutation_importance(clf, X_train_multichannel, y_train_multichannel)
+perm_importance = calculate_permutation_importance(clf, X_train, y_train)
 
 # Set importance of 'length_approx' to 0 in all plots (to avoid errors)
-length_approx_index = len(perm_importance_combined)  # This will be the last column for 'length_approx'
-
-# Zero out the importance of 'length_approx' to avoid errors
-perm_importance_combined = np.append(perm_importance_combined, 0) 
-perm_importance_streaming = np.append(perm_importance_streaming, 0) 
-perm_importance_multichannel = np.append(perm_importance_multichannel, 0)
-
-# Plotting the permutation feature importance
-labels = ["transactional", "external", 
-    "coordination", "technical", "demand", "number_of_types", "word_count", "length_approx"]
+# Extract feature names from the processed data, since one-hot encoding changes them
+labels = list(X.columns)
 
 # Normalize the permutation importance values (scale each to 0-1 range)
-perm_importance_combined = perm_importance_combined / np.max(perm_importance_combined)
-perm_importance_streaming = perm_importance_streaming / np.max(perm_importance_streaming)
-perm_importance_multichannel = perm_importance_multichannel / np.max(perm_importance_multichannel)
+perm_importance = perm_importance / np.max(perm_importance)
 
-# Plot comparison of permutation importances
-fig, ax = plt.subplots(figsize=(10, 6))
-x = np.arange(len(labels))
-
-# Plot bars for each dataset with subtle shades of blue
-ax.bar(x - 0.2, perm_importance_combined, width=0.2, label="Combined", color='#A6C8FF')  # Light blue
-ax.bar(x, perm_importance_streaming, width=0.2, label="Streaming", color='#5D9CFF')    # Medium blue
-ax.bar(x + 0.2, perm_importance_multichannel, width=0.2, label="Multichannel", color='#1F64A6')  # Dark blue
-
-# Add labels and title
-ax.set_xticks(x)
-ax.set_xticklabels([label.replace('_', ' ').title() for label in labels], rotation=90)
+# Plotting the permutation feature importance
+fig, ax = plt.subplots(figsize=(15, 8)) # Increased figure size for readability
+ax.bar(range(len(labels)), perm_importance)
+ax.set_xticks(range(len(labels)))
+ax.set_xticklabels([label.replace('_', ' ').title() for label in labels], rotation=90) # Rotate labels for readability
 ax.set_xlabel('Features')
 ax.set_ylabel('Normalized Permutation Importance')
-ax.set_title('Comparison of Feature Importance Across Datasets')
-ax.legend()
-
+ax.set_title('Feature Importance')
 plt.tight_layout()
 plt.show()

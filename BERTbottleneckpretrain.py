@@ -1,84 +1,71 @@
-# Load the tokenizer
-from transformers import BertTokenizer, LineByLineTextDataset
+from transformers import BertTokenizer, BertForMaskedLM, LineByLineTextDataset, DataCollatorForLanguageModeling, Trainer, TrainingArguments
 from torch.utils.data import random_split
 
-vocab_file_dir = 'vocab.txt'
-raw_file_dir = 'BERT_pretrain.txt'
+# 1. Load the BusinessBERT Tokenizer and Model
+model_name = "pborchet/businessBERT"
+tokenizer = BertTokenizer.from_pretrained(model_name)
+model = BertForMaskedLM.from_pretrained(model_name)
 
-tokenizer = BertTokenizer.from_pretrained('colaguo/bottleneckBERT')
+# 2. Data Preparation
+raw_file_dir = 'BERT_pretrain.txt'  # Your text data
 
-# sentence = 'Collin is working on business bottlenecks'
-# encoded_input = tokenizer.tokenize(sentence)
-# print(encoded_input)
-
-# Load the entire dataset
 dataset = LineByLineTextDataset(
-    tokenizer = tokenizer,
-    file_path = raw_file_dir,
-    block_size = 128  # maximum sequence length
+    tokenizer=tokenizer,
+    file_path=raw_file_dir,
+    block_size=128
 )
 
-print('Total No. of lines: ', len(dataset)) # Total number of lines in your dataset
-
-
-# --- Splitting the dataset ---
-train_size = int(0.8 * len(dataset))  # 80% for training
-test_size = int(0.1 * len(dataset))    # 10% for testing
-eval_size = len(dataset) - train_size - test_size # remaining 10% for evaluation
-
+# Split the dataset
+train_size = int(0.8 * len(dataset))
+test_size = int(0.1 * len(dataset))
+eval_size = len(dataset) - train_size - test_size
 
 train_dataset, test_dataset, eval_dataset = random_split(dataset, [train_size, test_size, eval_size])
 
-print('Training dataset size: ', len(train_dataset))
-print('Test dataset size: ', len(test_dataset))
-print('Evaluation dataset size: ', len(eval_dataset))
-# --- End of dataset splitting ---
-
-from transformers import BertConfig, BertForMaskedLM, DataCollatorForLanguageModeling
-
-config = BertConfig(
-    vocab_size=50000,
-    hidden_size=768, 
-    num_hidden_layers=6, 
-    num_attention_heads=12,
-    max_position_embeddings=512
-)
- 
-model = BertForMaskedLM(config)
-print('No of parameters: ', model.num_parameters())
-
-
+# 3. Data Collator
 data_collator = DataCollatorForLanguageModeling(
-    tokenizer=tokenizer, mlm=True, mlm_probability=0.15
+    tokenizer=tokenizer,
+    mlm=True,
+    mlm_probability=0.15
 )
 
-from transformers import Trainer, TrainingArguments, EarlyStoppingCallback, IntervalStrategy
+# 4. Training Arguments
+output_dir = '/working/'  # Where to save the fine-tuned model
 
 training_args = TrainingArguments(
-    output_dir='/working/',
+    output_dir=output_dir,
     overwrite_output_dir=True,
-    num_train_epochs=30,
+    num_train_epochs=5,
     per_device_train_batch_size=32,
-    evaluation_strategy = IntervalStrategy.STEPS,
-    eval_steps = 50, # Evaluation and Save happens every 50 steps
-    save_total_limit = 5, # Only last 5 models are saved. Older ones are deleted.
     per_device_eval_batch_size=32,
-    save_steps=10_000,
-    
+    evaluation_strategy="steps",
+    eval_steps=500,
+    save_steps=500,
+    save_total_limit=3,
+    learning_rate=5e-5,
     weight_decay=0.01,
-    push_to_hub=True,
+    warmup_steps=500,
+    logging_dir='./logs',
+    logging_steps=100,
     load_best_model_at_end=True,
-    
+    metric_for_best_model="eval_loss",
+    greater_is_better=False,
+    push_to_hub=True,  # Enable pushing to the Hub
+    hub_model_id="colaguo/bottleneckBERTsmall",  # Your repository ID
 )
 
+# 5. Trainer
 trainer = Trainer(
     model=model,
     args=training_args,
     data_collator=data_collator,
-    train_dataset=train_dataset, # Use the training dataset
-    eval_dataset=eval_dataset,   # Add the evaluation dataset
+    train_dataset=train_dataset,
+    eval_dataset=eval_dataset,
+    tokenizer=tokenizer,  # Pass the tokenizer to the Trainer
 )
 
-
+# 6. Train and Save
 trainer.train()
-trainer.save_model('/working/')
+trainer.save_model(output_dir)  # Save the fine-tuned model
+
+print(f"Fine-tuned model saved to {output_dir} and pushed to colaguo/bottleneckBERTsmall on Hugging Face Hub")
