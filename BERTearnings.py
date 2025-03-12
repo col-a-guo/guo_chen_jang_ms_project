@@ -4,8 +4,9 @@ from transformers import AutoTokenizer, AutoModel
 from torch.utils.data import DataLoader, Dataset
 from transformers import get_scheduler
 from datasets import load_dataset
+from datasets import Dataset as HFDataset #Import Dataset
 from collections import Counter
-from imblearn.under_sampling import RandomUnderSampler
+#from imblearn.under_sampling import RandomUnderSampler #No longer import undersampler
 import torchmetrics
 from sklearn.metrics import confusion_matrix, classification_report
 import random
@@ -14,6 +15,8 @@ from huggingface_hub import PyTorchModelHubMixin
 import pandas as pd
 from sklearn.preprocessing import OneHotEncoder
 from torch.optim.lr_scheduler import LambdaLR, ExponentialLR
+import os  # Import the 'os' module
+from datetime import datetime # Import the 'datetime' module
 
 seed_value = 1
 random.seed(seed_value)
@@ -24,7 +27,7 @@ torch.cuda.manual_seed_all(seed_value)  # If using CUDA
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 
-version_list = ["colaguo-working"]  # Updated version list
+version_list = ["bert-uncased", "businessBERT","bottleneckBERT"]  # Updated version list
 
 # Default hyperparameters (removed Optuna dependency)
 default_lr = 5e-5 #initial learning rate
@@ -89,8 +92,8 @@ class BertClassifier(nn.Module, PyTorchModelHubMixin):
             self.bert = AutoModel.from_pretrained('google-bert/bert-base-uncased')
         elif version == "businessBERT":
             self.bert = AutoModel.from_pretrained('pborchert/BusinessBERT')
-        elif version == "colaguo-working":
-            self.bert = AutoModel.from_pretrained('colaguo/working')
+        elif version == "bottleneckBERT":
+            self.bert = AutoModel.from_pretrained('colaguo/bottleneckBERTsmall')
         else:
            raise ValueError(f"Invalid model version: {version}")
         
@@ -161,18 +164,28 @@ def load_tokenizer(version):
         return AutoTokenizer.from_pretrained('google-bert/bert-base-uncased')
     elif version == "businessBERT":
         return AutoTokenizer.from_pretrained('pborchert/BusinessBERT')
-    elif version == "colaguo-working":
-        return AutoTokenizer.from_pretrained('colaguo/bottleneckBERT')
+    elif version == "bottleneckBERT":
+        return AutoTokenizer.from_pretrained('pborchert/BusinessBERT')
     else:
         raise ValueError(f"Invalid model version: {version}")
 
 # Load dataset and preprocess
-ogpath = "feb_20_stitched.csv"
-dataset = load_dataset('csv', data_files={'train': "train_" + ogpath, 'test': "test_" + ogpath})
+ogpath = "feb_24_combined.csv"
+ogpath2 = "feb_20_stitched.csv"
+
+# Load the datasets
+dataset1 = load_dataset('csv', data_files={'train': "train_" + ogpath, 'test': "test_" + ogpath})
+dataset2 = load_dataset('csv', data_files={'train': "train_" + ogpath2, 'test': "test_" + ogpath2})
 
 # Load the CSVs into pandas to encode bottid correctly, then pass back into the HF dataset.
-train_df = pd.read_csv("train_" + ogpath)
-test_df = pd.read_csv("test_" + ogpath)
+train_df1 = pd.read_csv("train_" + ogpath)
+test_df1 = pd.read_csv("test_" + ogpath)
+train_df2 = pd.read_csv("train_" + ogpath2)
+test_df2 = pd.read_csv("test_" + ogpath2)
+
+# Combine the dataframes
+train_df = pd.concat([train_df1, train_df2], ignore_index=True)
+test_df = pd.concat([test_df1, test_df2], ignore_index=True)
 
 #One-Hot-Encode the bottid features
 encoder = OneHotEncoder(handle_unknown='ignore')
@@ -200,14 +213,20 @@ train_df = train_df.drop('bottid', axis=1)
 test_df = test_df.drop('bottid', axis=1)
 
 #Convert the dataframes back to HuggingFace datasets
-dataset['train'] = dataset['train'].from_pandas(train_df)
-dataset['test'] = dataset['test'].from_pandas(test_df)
+# Create HF datasets from the pandas DataFrames.
+hf_train_dataset = HFDataset.from_pandas(train_df)
+hf_test_dataset = HFDataset.from_pandas(test_df)
 
+# Combine the train and test datasets into a single dataset dictionary
+dataset = {
+    'train': hf_train_dataset,
+    'test': hf_test_dataset
+}
 
 # Truncate dataset; useful to avoid resampling errors due to requesting more samples than exist
 # also reducing to very small numbers for testing
 def truncate_dataset(dataset):
-    k = round(len(dataset)*0.97)
+    k = round(len(dataset)*0.99)
     random_indices = random.sample(range(len(dataset)), k)
     return dataset.select(random_indices)
 
@@ -280,7 +299,16 @@ def train_and_evaluate(model, train_dataloader, val_dataloader, optimizer, warmu
     model.to(device)
     best_f1 = 0.0
     patience_counter = 0
-    current_step = 0  # Initialize current_step
+    current_step = 0
+    best_epoch = 0  # Keep track of the epoch with the best F1
+    output_dir = "model_output"  # Define directory
+    best_model_state = None #To store the state dict of best model
+
+    # Create the output directory if it doesn't exist
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+
 
     for epoch in range(epochs):
         model.train()
@@ -321,16 +349,29 @@ def train_and_evaluate(model, train_dataloader, val_dataloader, optimizer, warmu
         # Early stopping based on F1 score
         if f1_score > best_f1:
             best_f1 = f1_score
+            best_epoch = epoch + 1 # Store the best epoch
             patience_counter = 0
+            best_model_state = model.state_dict() # Save best model state
+            print(f"New best F1 score: {best_f1:.4f} at epoch {epoch+1}.") # Epoch logging
         else:
             patience_counter += 1
             if patience_counter >= patience:
                 print("Early stopping triggered.")
                 break
 
-    tokenizer.push_to_hub("colaguo/my-awesome-model")
+    # Load best model weights, then save
+    if best_model_state is not None:
+        model.load_state_dict(best_model_state) # load best model
+        model_filename = f"model_output/model_version_{version}.pth"  # Added version and timestamp
+        torch.save(model.state_dict(), model_filename)  # Save the model's weights
+        print(f"Best model (version {version}) saved to {model_filename} with F1 {best_f1:.4f}")
+
+    
+    tokenizer.push_to_hub(f"colaguo/{version}_finetune_feb24")
     # push to the hub
-    model.push_to_hub("colaguo/my-awesome-model")
+    model.push_to_hub(f"colaguo/{version}_finetune_feb24")
+
+    print(f"Training completed. Best F1 score: {best_f1:.4f} achieved at epoch {best_epoch}.") #Log the best F1 after training.
     return best_f1
 
 # Main loop
@@ -354,15 +395,19 @@ for version in version_list:
     # Determine the minimum count of a class
     min_count = min(label_counts.values())
     
-    # Apply undersampling to the training data
-    sampler = RandomUnderSampler(sampling_strategy={0:int(round(min_count*1.4)), 1: min_count}) #3200:400
-    train_indices = list(range(len(train_labels)))
-    resampled_indices, resampled_labels = sampler.fit_resample(np.array(train_indices).reshape(-1, 1), np.array(train_labels))
-    resampled_indices = resampled_indices.flatten().tolist()
+    # # Apply undersampling to the training data
+    # sampler = RandomUnderSampler(sampling_strategy={0:int(round(min_count*1.4)), 1:min_count}) #3200:400
+    # train_indices = list(range(len(train_labels)))
+    # resampled_indices, resampled_labels = sampler.fit_resample(np.array(train_indices).reshape(-1, 1), np.array(train_indices))
+    # resampled_indices = resampled_indices.flatten().tolist()
     
-    resampled_train_data = torch.utils.data.Subset(train_data, resampled_indices)
-    resampled_label_counts = Counter(resampled_labels)
-    print("Resampled label distribution:", resampled_label_counts)
+    # resampled_train_data = torch.utils.data.Subset(train_data, resampled_indices)
+    # resampled_label_counts = Counter(resampled_labels)
+    # print("Resampled label distribution:", resampled_label_counts)
+
+    #Use full dataset
+    train_data_loader = DataLoader(train_data, batch_size=default_batch_size, shuffle=True)
+    test_dataloader = DataLoader(test_data, batch_size=default_batch_size)
 
 
     normalized_weights = torch.tensor([1.0, 1.2])
@@ -371,7 +416,9 @@ for version in version_list:
     # Initialize Model
     model = BertClassifier(version, num_labels=2, num_bottid_categories=num_bottid_categories).to(device) # Initialize before weights, pass num_bottid_categories here
 
-    train_dataloader = DataLoader(resampled_train_data, batch_size=default_batch_size, shuffle=True)
+    #train_dataloader = DataLoader(resampled_train_data, batch_size=default_batch_size, shuffle=True)
+    #Remove train_dataloader and just use train_data instead to use full dataloaders
+    train_dataloader = train_data_loader
     test_dataloader = DataLoader(test_data, batch_size=default_batch_size)
 
     #Set up the optimizer
