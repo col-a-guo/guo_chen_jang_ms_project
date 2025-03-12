@@ -20,7 +20,7 @@ combined = pd.read_csv("feb_20_combined.csv")
 features = [
     "scarcity", "nonuniform_progress", "performance_constraints", "user_heterogeneity",
     "cognitive", "external", "internal", "coordination", "transactional", "technical",
-    "demand", "label", "bottid"
+    "demand", "label", "bottid", "word_count", 
 ]
 
 # Control variables (no longer used, so kept empty)
