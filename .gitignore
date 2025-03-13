@@ -7,3 +7,4 @@ secrets.txt
 output_bert-uncased
 colaguo
 logs
+model_output
