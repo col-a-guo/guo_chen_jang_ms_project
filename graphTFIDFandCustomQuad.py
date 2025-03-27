@@ -7,10 +7,8 @@ from imblearn.over_sampling import RandomOverSampler
 from imblearn.under_sampling import RandomUnderSampler
 import matplotlib.pyplot as plt
 # Load the dataset
-combined = pd.read_csv("dec_5_combined.csv")
+filtered_data = pd.read_csv("feb_24_combined.csv")
 
-# Filter data where "singlebott" == 1
-filtered_data = combined[combined["singlebott"] != -1]
 
 # Ensure no missing values in 'paragraph' column
 filtered_data["paragraph"] = filtered_data["paragraph"].fillna("")

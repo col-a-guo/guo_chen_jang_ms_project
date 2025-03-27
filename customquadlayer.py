@@ -43,14 +43,14 @@ def train_and_evaluate(data):  # Pass the DataFrame directly
     bottid_encoded = encoder.fit_transform(data[['bottid']])
     bottid_df = pd.DataFrame(bottid_encoded, columns=encoder.get_feature_names_out(['bottid']))
 
-    # Filter the one-hot encoded bottid columns
-    selected_bottid_cols = [col for col in bottid_df.columns if col in ['bottid_5', 'bottid_13', 'bottid_12', 'bottid_14', 'bottid_15', 'bottid_17', 'bottid_18', 'bottid_20']]
-    bottid_df_selected = bottid_df[selected_bottid_cols]
+    # # Filter the one-hot encoded bottid columns
+    # selected_bottid_cols = [col for col in bottid_df.columns if col in ['bottid_5', 'bottid_13', 'bottid_12', 'bottid_14', 'bottid_15', 'bottid_17', 'bottid_18', 'bottid_20']]
+    # bottid_df_selected = bottid_df[selected_bottid_cols]
 
-    # Add selected bottid features to the polynomial feature labels
-    labels_for_quad.extend(selected_bottid_cols)
+    # # Add selected bottid features to the polynomial feature labels
+    # labels_for_quad.extend(selected_bottid_cols)
 
-    data_for_poly = pd.concat([data, bottid_df_selected], axis=1)
+    data_for_poly = pd.concat([data], axis=1)
 
     # *** DEBUGGING: Check for NaNs before PolynomialFeatures ***
     print("\n--- Checking for NaNs BEFORE PolynomialFeatures ---")
@@ -109,7 +109,7 @@ def train_and_evaluate(data):  # Pass the DataFrame directly
     )
 
     # Iterative feature dropping with early stopping
-    def iterative_feature_dropping(X_train, y_train, X_val, y_val, stacking_clf, drop_percent=0.10, patience=10):
+    def iterative_feature_dropping(X_train, y_train, X_val, y_val, stacking_clf, drop_percent=0.10, patience=20):
         surviving_features = X_train.columns.tolist()
         best_features = surviving_features[:]  # Initialize with all features
         best_loss = float('inf')

@@ -4,7 +4,6 @@ from transformers import AutoTokenizer, AutoModel
 from torch.utils.data import DataLoader, Dataset
 from transformers import get_scheduler
 from datasets import load_dataset
-from datasets import Dataset as HFDataset #Import Dataset
 from collections import Counter
 #from imblearn.under_sampling import RandomUnderSampler #No longer import undersampler
 import torchmetrics
@@ -27,7 +26,7 @@ torch.cuda.manual_seed_all(seed_value)  # If using CUDA
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 
-version_list = ["bert-uncased", "businessBERT","bottleneckBERT"]  # Updated version list
+version_list = ['businessBERT',"bottleneckBERT","bert-uncased"]  # Updated version list
 
 # Default hyperparameters (removed Optuna dependency)
 default_lr = 5e-5 #initial learning rate
@@ -56,7 +55,7 @@ def generate_classification_report(model, dataloader, num_classes, epoch=None, v
     all_labels = np.array(all_labels)
 
     # Generate sklearn classification report
-    report = classification_report(all_labels, all_preds, target_names=[str(i) for i in range(num_classes)], zero_division=0) # Added zero_division
+    report = classification_report(all_labels, all_preds, target_names=[str(i) for i in range(num_classes)], digits=4, zero_division=0) # Added zero_division
     
     # Confusion Matrix
     cm = confusion_matrix(all_labels, all_preds, labels=list(range(num_classes)))
@@ -93,7 +92,7 @@ class BertClassifier(nn.Module, PyTorchModelHubMixin):
         elif version == "businessBERT":
             self.bert = AutoModel.from_pretrained('pborchert/BusinessBERT')
         elif version == "bottleneckBERT":
-            self.bert = AutoModel.from_pretrained('colaguo/bottleneckBERTsmall')
+            self.bert = AutoModel.from_pretrained('colaguo/bottleneckBERTlarge')
         else:
            raise ValueError(f"Invalid model version: {version}")
         
@@ -170,22 +169,12 @@ def load_tokenizer(version):
         raise ValueError(f"Invalid model version: {version}")
 
 # Load dataset and preprocess
-ogpath = "feb_24_combined.csv"
-ogpath2 = "feb_20_stitched.csv"
-
-# Load the datasets
-dataset1 = load_dataset('csv', data_files={'train': "train_" + ogpath, 'test': "test_" + ogpath})
-dataset2 = load_dataset('csv', data_files={'train': "train_" + ogpath2, 'test': "test_" + ogpath2})
+ogpath = "feb_20_stitched.csv"
+dataset = load_dataset('csv', data_files={'train': "train_" + ogpath, 'test': "test_" + ogpath})
 
 # Load the CSVs into pandas to encode bottid correctly, then pass back into the HF dataset.
-train_df1 = pd.read_csv("train_" + ogpath)
-test_df1 = pd.read_csv("test_" + ogpath)
-train_df2 = pd.read_csv("train_" + ogpath2)
-test_df2 = pd.read_csv("test_" + ogpath2)
-
-# Combine the dataframes
-train_df = pd.concat([train_df1, train_df2], ignore_index=True)
-test_df = pd.concat([test_df1, test_df2], ignore_index=True)
+train_df = pd.read_csv("train_" + ogpath)
+test_df = pd.read_csv("test_" + ogpath)
 
 #One-Hot-Encode the bottid features
 encoder = OneHotEncoder(handle_unknown='ignore')
@@ -213,15 +202,9 @@ train_df = train_df.drop('bottid', axis=1)
 test_df = test_df.drop('bottid', axis=1)
 
 #Convert the dataframes back to HuggingFace datasets
-# Create HF datasets from the pandas DataFrames.
-hf_train_dataset = HFDataset.from_pandas(train_df)
-hf_test_dataset = HFDataset.from_pandas(test_df)
+dataset['train'] = dataset['train'].from_pandas(train_df)
+dataset['test'] = dataset['test'].from_pandas(test_df)
 
-# Combine the train and test datasets into a single dataset dictionary
-dataset = {
-    'train': hf_train_dataset,
-    'test': hf_test_dataset
-}
 
 # Truncate dataset; useful to avoid resampling errors due to requesting more samples than exist
 # also reducing to very small numbers for testing
