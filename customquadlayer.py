@@ -184,7 +184,7 @@ def train_and_evaluate(data):  # Pass the DataFrame directly
     # Classification report
     classification_rep = classification_report(y_test, y_pred, output_dict=True)
     print("Classification Report:")
-    print(classification_report(y_test, y_pred))
+    print(classification_report(y_test, y_pred, digits=4))
 
     # Final permutation importance for surviving features
     perm_importance = permutation_importance(stacking_clf, X_test[surviving_features], y_test, n_repeats=10, random_state=42)

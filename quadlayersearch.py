@@ -89,7 +89,7 @@ def calculate_permutation_importance(clf, X_train, y_train):
 def print_classification_report(clf, X_test, y_test, dataset_name):
     y_pred = clf.predict(X_test)
     print(f"Classification Report for {dataset_name}:")
-    print(classification_report(y_test, y_pred))
+    print(classification_report(y_test, y_pred, digits=4))
 
 # Train and evaluate the model
 clf.fit(X_train, y_train)
