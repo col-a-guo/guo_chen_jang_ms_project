@@ -82,7 +82,7 @@ Classification Report ({split_name}, Version: {version}, Epoch {epoch if epoch i
 
     return f1, all_preds, all_labels  # Return predictions and labels
 
-def create_test_sets(test_dataset, num_sets=5, subset_size=0.2):
+def create_test_sets(test_dataset, num_sets=10, subset_size=0.9):
     """
     Splits the test set into `num_sets` subsets, each containing `subset_size` proportion
     of the data for each label.
@@ -165,16 +165,16 @@ def evaluate_on_multiple_test_sets(model, test_sets, num_classes=2, version=None
 
     results = {}
     for metric_name, values in metrics.items():
-        results[f'{metric_name}_avg'] = np.mean(values)
-        results[f'{metric_name}_std'] = np.std(values)
+        results[metric_name + "_avg"] = np.mean(values)
+        results[metric_name + "_std"] = np.std(values)
 
     #Print final report
     final_report = "Averaged performance across all test sets:\n"
-    for metric_name, avg_value in results.items():
-        if "avg" in metric_name:
-            std_name = metric_name[:-3] + "std"
-            if std_name in results: # Check to make sure that we don't cause a key error
-                final_report += f"{metric_name}: {avg_value:.4f} +/- {results[std_name]:.4f}\n"
+    for metric_name, value in results.items():
+        if "_avg" in metric_name:
+          std_name = metric_name.replace("_avg", "_std")
+          if std_name in results: # Check to make sure that we don't cause a key error
+            final_report += f"{metric_name}: {value:.4f} +/- {results[std_name]:.4f}\n"
 
     print(final_report)
     with open("classification_report.txt", "a") as f:
@@ -439,12 +439,8 @@ def train_and_evaluate(model, train_dataloader, val_dataloader, optimizer, warmu
             patience_counter = 0
             best_model_state = model.state_dict() # Save best model state
             print(f"New best F1 score: {best_f1:.4f} at epoch {epoch+1}.") # Epoch logging
-            
-            # Evaluate and report on multiple test sets when a new best model is found
-            if test_sets is not None:
-                print("Evaluating on multiple test sets...")
-                evaluate_on_multiple_test_sets(model, test_sets, num_classes=num_classes, version=version)
-                print("Evaluation on multiple test sets complete.")
+
+
 
 
         else:
@@ -460,10 +456,16 @@ def train_and_evaluate(model, train_dataloader, val_dataloader, optimizer, warmu
         torch.save(model.state_dict(), model_filename)  # Save the model's weights
         print(f"Best model (version {version}) saved to {model_filename} with F1 {best_f1:.4f}")
 
+        # Evaluate and report on multiple test sets when a new best model is found
+        if test_sets is not None:
+            print("Evaluating on multiple test sets...")
+            evaluate_on_multiple_test_sets(model, test_sets, num_classes=num_classes, version=version)
+            print("Evaluation on multiple test sets complete.")
+
     
-    # tokenizer.push_to_hub(f"colaguo/{version}_finetune_feb24")
-    # # push to the hub
-    # model.push_to_hub(f"colaguo/{version}_finetune_feb24")
+    tokenizer.push_to_hub(f"colaguo/{version}_finetune_feb24")
+    # push to the hub
+    model.push_to_hub(f"colaguo/{version}_finetune_feb24")
 
     print(f"Training completed. Best F1 score: {best_f1:.4f} achieved at epoch {best_epoch}.") #Log the best F1 after training.
     return best_f1
@@ -540,6 +542,6 @@ for version in version_list:
 
 
     #Evaluate on multiple test sets: #Only do this at the end!
-    #evaluate_on_multiple_test_sets(model, test_sets, num_classes=2, version=version)
+    evaluate_on_multiple_test_sets(model, test_sets, num_classes=2, version=version)
     val_dataloader = DataLoader(test_data, batch_size=default_batch_size) #Load data for report at the end.
     generate_classification_report(model, val_dataloader, num_classes=2, version=version) #Final report at the end.
