@@ -26,7 +26,7 @@ torch.cuda.manual_seed_all(seed_value)  # If using CUDA
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 
-version_list = ['businessBERT',"bottleneckBERT","bert-uncased"]  # Updated version list
+version_list = ["bottleneckBERT"]  # Updated version list
 
 # Default hyperparameters (removed Optuna dependency)
 default_lr = 5e-5 #initial learning rate
@@ -195,7 +195,7 @@ class BertClassifier(nn.Module, PyTorchModelHubMixin):
         elif version == "businessBERT":
             self.bert = AutoModel.from_pretrained('pborchert/BusinessBERT')
         elif version == "bottleneckBERT":
-            self.bert = AutoModel.from_pretrained('colaguo/bottleneckBERTlarge')
+            self.bert = AutoModel.from_pretrained('colaguo/working')
         else:
            raise ValueError(f"Invalid model version: {version}")
         
@@ -463,9 +463,9 @@ def train_and_evaluate(model, train_dataloader, val_dataloader, optimizer, warmu
             print("Evaluation on multiple test sets complete.")
 
     
-    tokenizer.push_to_hub(f"colaguo/{version}_finetune_feb24")
-    # push to the hub
-    model.push_to_hub(f"colaguo/{version}_finetune_feb24")
+    # tokenizer.push_to_hub(f"colaguo/{version}_finetune_feb24")
+    # # push to the hub
+    # model.push_to_hub(f"colaguo/{version}_finetune_feb24")
 
     print(f"Training completed. Best F1 score: {best_f1:.4f} achieved at epoch {best_epoch}.") #Log the best F1 after training.
     return best_f1
