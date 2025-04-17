@@ -5,4 +5,6 @@ wandb
 ray_results
 secrets.txt
 output_bert-uncased
+colaguo
+logs
 model_output

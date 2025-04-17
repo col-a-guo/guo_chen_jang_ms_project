@@ -1,10 +1,9 @@
 import torch
 import torch.nn as nn
 from transformers import AutoTokenizer, AutoModel
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader, Dataset, Subset
 from transformers import get_scheduler
 from datasets import load_dataset
-from datasets import Dataset as HFDataset #Import Dataset
 from collections import Counter
 #from imblearn.under_sampling import RandomUnderSampler #No longer import undersampler
 import torchmetrics
@@ -27,7 +26,7 @@ torch.cuda.manual_seed_all(seed_value)  # If using CUDA
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 
-version_list = ["bert-uncased", "businessBERT","bottleneckBERT"]  # Updated version list
+version_list = ["bottleneckBERT"]  # Updated version list
 
 # Default hyperparameters (removed Optuna dependency)
 default_lr = 5e-5 #initial learning rate
@@ -39,7 +38,7 @@ target_lr = 8e-6 #Target after 10 epochs
 warmup_proportion = 0.2
 
 # Function to generate classification report for multi-class
-def generate_classification_report(model, dataloader, num_classes, epoch=None, version=None):
+def generate_classification_report(model, dataloader, num_classes, epoch=None, version=None, split_name="Test"):
     model.eval()
     all_preds = []
     all_labels = []
@@ -56,7 +55,7 @@ def generate_classification_report(model, dataloader, num_classes, epoch=None, v
     all_labels = np.array(all_labels)
 
     # Generate sklearn classification report
-    report = classification_report(all_labels, all_preds, target_names=[str(i) for i in range(num_classes)], zero_division=0) # Added zero_division
+    report = classification_report(all_labels, all_preds, target_names=[str(i) for i in range(num_classes)], digits=4, zero_division=0) # Added zero_division
     
     # Confusion Matrix
     cm = confusion_matrix(all_labels, all_preds, labels=list(range(num_classes)))
@@ -69,7 +68,7 @@ def generate_classification_report(model, dataloader, num_classes, epoch=None, v
     
 
     final_report = f"""
-Classification Report (Version: {version}, Epoch {epoch if epoch is not None else 'Final'}):\n
+Classification Report ({split_name}, Version: {version}, Epoch {epoch if epoch is not None else 'Final'}):\n
 {report}\n
 {cm_report}
 """
@@ -81,7 +80,110 @@ Classification Report (Version: {version}, Epoch {epoch if epoch is not None els
     
     f1 = classification_report(all_labels, all_preds, target_names=[str(i) for i in range(num_classes)], output_dict=True, zero_division=0)['macro avg']['f1-score'] # Added zero_division
 
-    return f1
+    return f1, all_preds, all_labels  # Return predictions and labels
+
+def create_test_sets(test_dataset, num_sets=10, subset_size=0.9):
+    """
+    Splits the test set into `num_sets` subsets, each containing `subset_size` proportion
+    of the data for each label.
+
+    Args:
+        test_dataset: The PyTorch Dataset representing the test set.
+        num_sets: The number of test subsets to create.
+        subset_size: The proportion of each label to include in each subset (e.g., 0.2 for 20%).
+
+    Returns:
+        A list of PyTorch Subsets, each representing a test subset.
+    """
+
+    # Get indices of samples for each label
+    label_0_indices = [i for i, item in enumerate(test_dataset) if item[-1] == 0] #item[-1] is label
+    label_1_indices = [i for i, item in enumerate(test_dataset) if item[-1] == 1]
+
+    # Calculate the number of samples to select for each label in each subset
+    num_label_0_samples = int(len(label_0_indices) * subset_size)
+    num_label_1_samples = int(len(label_1_indices) * subset_size)
+
+    test_sets = []
+    for _ in range(num_sets):
+        # Randomly select indices for each label
+        subset_label_0_indices = random.sample(label_0_indices, num_label_0_samples)
+        subset_label_1_indices = random.sample(label_1_indices, num_label_1_samples)
+
+        # Combine the indices
+        subset_indices = subset_label_0_indices + subset_label_1_indices
+        random.shuffle(subset_indices)  # Shuffle the combined indices
+
+        # Create a Subset from the selected indices
+        subset = Subset(test_dataset, subset_indices)
+        test_sets.append(subset)
+
+    return test_sets
+
+def evaluate_on_multiple_test_sets(model, test_sets, num_classes=2, version=None):
+    """
+    Evaluates the model on multiple test sets and calculates the average performance and standard deviations.
+
+    Args:
+        model: The trained PyTorch model.
+        test_sets: A list of PyTorch Subsets, each representing a test subset.
+        num_classes: The number of classes in the classification problem.
+        version: The version of the model for reporting purposes.
+
+    Returns:
+        A dictionary containing the average classification report metrics and standard deviations.
+    """
+
+    all_reports = []
+    all_preds = []
+    all_labels = []
+    for i, test_set in enumerate(test_sets):
+        dataloader = DataLoader(test_set, batch_size=default_batch_size)
+        f1, preds, labels = generate_classification_report(model, dataloader, num_classes, version=version, split_name=f"Test Set {i+1}")
+        all_reports.append(classification_report(labels, preds, target_names=[str(i) for i in range(num_classes)], output_dict=True, zero_division=0))
+        all_preds.extend(preds)
+        all_labels.extend(labels)
+
+    # Calculate average metrics and standard deviations
+    metrics = {}
+    for class_idx in range(num_classes):
+        class_str = str(class_idx)
+        metrics[f'precision_{class_str}'] = [report[class_str]['precision'] for report in all_reports]
+        metrics[f'recall_{class_str}'] = [report[class_str]['recall'] for report in all_reports]
+        metrics[f'f1-score_{class_str}'] = [report[class_str]['f1-score'] for report in all_reports]
+        metrics[f'support_{class_str}'] = [report[class_str]['support'] for report in all_reports]
+
+    metrics['macro_avg_precision'] = [report['macro avg']['precision'] for report in all_reports]
+    metrics['macro_avg_recall'] = [report['macro avg']['recall'] for report in all_reports]
+    metrics['macro_avg_f1-score'] = [report['macro avg']['f1-score'] for report in all_reports]
+    metrics['macro_avg_support'] = [report['macro avg']['support'] for report in all_reports]
+
+    metrics['weighted_avg_precision'] = [report['weighted avg']['precision'] for report in all_reports]
+    metrics['weighted_avg_recall'] = [report['weighted avg']['recall'] for report in all_reports]
+    metrics['weighted_avg_f1-score'] = [report['weighted avg']['f1-score'] for report in all_reports]
+    metrics['weighted_avg_support'] = [report['weighted avg']['support'] for report in all_reports]
+
+    results = {}
+    for metric_name, values in metrics.items():
+        results[metric_name + "_avg"] = np.mean(values)
+        results[metric_name + "_std"] = np.std(values)
+
+    #Print final report
+    final_report = "Averaged performance across all test sets:\n"
+    for metric_name, value in results.items():
+        if "_avg" in metric_name:
+          std_name = metric_name.replace("_avg", "_std")
+          if std_name in results: # Check to make sure that we don't cause a key error
+            final_report += f"{metric_name}: {value:.4f} +/- {results[std_name]:.4f}\n"
+
+    print(final_report)
+    with open("classification_report.txt", "a") as f:
+        f.write(final_report + "\n")
+    
+    
+    return results
+
+
 
 # Define the model architecture (using global pooling for all versions)
 class BertClassifier(nn.Module, PyTorchModelHubMixin):
@@ -93,7 +195,7 @@ class BertClassifier(nn.Module, PyTorchModelHubMixin):
         elif version == "businessBERT":
             self.bert = AutoModel.from_pretrained('pborchert/BusinessBERT')
         elif version == "bottleneckBERT":
-            self.bert = AutoModel.from_pretrained('colaguo/bottleneckBERTsmall')
+            self.bert = AutoModel.from_pretrained('colaguo/working')
         else:
            raise ValueError(f"Invalid model version: {version}")
         
@@ -170,22 +272,12 @@ def load_tokenizer(version):
         raise ValueError(f"Invalid model version: {version}")
 
 # Load dataset and preprocess
-ogpath = "feb_24_combined.csv"
-ogpath2 = "feb_20_stitched.csv"
-
-# Load the datasets
-dataset1 = load_dataset('csv', data_files={'train': "train_" + ogpath, 'test': "test_" + ogpath})
-dataset2 = load_dataset('csv', data_files={'train': "train_" + ogpath2, 'test': "test_" + ogpath2})
+ogpath = "feb_20_stitched.csv"
+dataset = load_dataset('csv', data_files={'train': "train_" + ogpath, 'test': "test_" + ogpath})
 
 # Load the CSVs into pandas to encode bottid correctly, then pass back into the HF dataset.
-train_df1 = pd.read_csv("train_" + ogpath)
-test_df1 = pd.read_csv("test_" + ogpath)
-train_df2 = pd.read_csv("train_" + ogpath2)
-test_df2 = pd.read_csv("test_" + ogpath2)
-
-# Combine the dataframes
-train_df = pd.concat([train_df1, train_df2], ignore_index=True)
-test_df = pd.concat([test_df1, test_df2], ignore_index=True)
+train_df = pd.read_csv("train_" + ogpath)
+test_df = pd.read_csv("test_" + ogpath)
 
 #One-Hot-Encode the bottid features
 encoder = OneHotEncoder(handle_unknown='ignore')
@@ -213,15 +305,9 @@ train_df = train_df.drop('bottid', axis=1)
 test_df = test_df.drop('bottid', axis=1)
 
 #Convert the dataframes back to HuggingFace datasets
-# Create HF datasets from the pandas DataFrames.
-hf_train_dataset = HFDataset.from_pandas(train_df)
-hf_test_dataset = HFDataset.from_pandas(test_df)
+dataset['train'] = dataset['train'].from_pandas(train_df)
+dataset['test'] = dataset['test'].from_pandas(test_df)
 
-# Combine the train and test datasets into a single dataset dictionary
-dataset = {
-    'train': hf_train_dataset,
-    'test': hf_test_dataset
-}
 
 # Truncate dataset; useful to avoid resampling errors due to requesting more samples than exist
 # also reducing to very small numbers for testing
@@ -295,7 +381,7 @@ def get_exponential_warmup_schedule(optimizer, warmup_steps, initial_lr, target_
     return warmup_scheduler, decay_scheduler
 
 # Training function
-def train_and_evaluate(model, train_dataloader, val_dataloader, optimizer, warmup_scheduler, decay_scheduler, epochs, loss_fn, patience=4, num_classes=2, version=None):
+def train_and_evaluate(model, train_dataloader, val_dataloader, optimizer, warmup_scheduler, decay_scheduler, epochs, loss_fn, patience=4, num_classes=2, version=None, test_sets=None):
     model.to(device)
     best_f1 = 0.0
     patience_counter = 0
@@ -344,7 +430,7 @@ def train_and_evaluate(model, train_dataloader, val_dataloader, optimizer, warmu
         print(f"Epoch {epoch + 1}/{epochs}, Training Loss: {avg_train_loss:.4f}, Validation Loss: {avg_val_loss:.4f}")
         
         # Generate and save the classification report every epoch
-        f1_score = generate_classification_report(model, val_dataloader, num_classes, epoch=epoch+1, version=version)
+        f1_score,_,_ = generate_classification_report(model, val_dataloader, num_classes, epoch=epoch+1, version=version, split_name="Val")
 
         # Early stopping based on F1 score
         if f1_score > best_f1:
@@ -353,6 +439,10 @@ def train_and_evaluate(model, train_dataloader, val_dataloader, optimizer, warmu
             patience_counter = 0
             best_model_state = model.state_dict() # Save best model state
             print(f"New best F1 score: {best_f1:.4f} at epoch {epoch+1}.") # Epoch logging
+
+
+
+
         else:
             patience_counter += 1
             if patience_counter >= patience:
@@ -366,10 +456,16 @@ def train_and_evaluate(model, train_dataloader, val_dataloader, optimizer, warmu
         torch.save(model.state_dict(), model_filename)  # Save the model's weights
         print(f"Best model (version {version}) saved to {model_filename} with F1 {best_f1:.4f}")
 
+        # Evaluate and report on multiple test sets when a new best model is found
+        if test_sets is not None:
+            print("Evaluating on multiple test sets...")
+            evaluate_on_multiple_test_sets(model, test_sets, num_classes=num_classes, version=version)
+            print("Evaluation on multiple test sets complete.")
+
     
-    tokenizer.push_to_hub(f"colaguo/{version}_finetune_feb24")
-    # push to the hub
-    model.push_to_hub(f"colaguo/{version}_finetune_feb24")
+    # tokenizer.push_to_hub(f"colaguo/{version}_finetune_feb24")
+    # # push to the hub
+    # model.push_to_hub(f"colaguo/{version}_finetune_feb24")
 
     print(f"Training completed. Best F1 score: {best_f1:.4f} achieved at epoch {best_epoch}.") #Log the best F1 after training.
     return best_f1
@@ -386,6 +482,9 @@ for version in version_list:
     num_bottid_categories = train_encoded.shape[1] #Determine the number of bottid categories
     train_data = CustomDataset(train_dataset, bottid_categories=num_bottid_categories) # pass to CustomDataset
     test_data = CustomDataset(test_dataset, bottid_categories=num_bottid_categories) # pass to CustomDataset
+
+    #Create test sets:
+    test_sets = create_test_sets(test_data)
 
     # Undersampling to balance labels
     train_labels = [item['label'] for item in train_dataset]
@@ -407,7 +506,7 @@ for version in version_list:
 
     #Use full dataset
     train_data_loader = DataLoader(train_data, batch_size=default_batch_size, shuffle=True)
-    test_dataloader = DataLoader(test_data, batch_size=default_batch_size)
+    #test_dataloader = DataLoader(test_data, batch_size=default_batch_size) #No longer pass full dataloader
 
 
     normalized_weights = torch.tensor([1.0, 1.2])
@@ -419,7 +518,7 @@ for version in version_list:
     #train_dataloader = DataLoader(resampled_train_data, batch_size=default_batch_size, shuffle=True)
     #Remove train_dataloader and just use train_data instead to use full dataloaders
     train_dataloader = train_data_loader
-    test_dataloader = DataLoader(test_data, batch_size=default_batch_size)
+    val_dataloader = DataLoader(test_data, batch_size=default_batch_size) #Use full test_data as val for early stopping
 
     #Set up the optimizer
     optimizer = torch.optim.AdamW(model.parameters(), lr=default_lr, eps=default_eps)
@@ -439,5 +538,10 @@ for version in version_list:
     )
 
     #Train and evaluate
-    train_and_evaluate(model, train_dataloader, test_dataloader, optimizer, warmup_scheduler, decay_scheduler, epochs=num_epochs, loss_fn=loss_fn, num_classes=2, version=version, patience=patience)
-    generate_classification_report(model, test_dataloader, num_classes=2, version=version)
+    train_and_evaluate(model, train_dataloader, val_dataloader, optimizer, warmup_scheduler, decay_scheduler, epochs=num_epochs, loss_fn=loss_fn, num_classes=2, version=version, test_sets=test_sets)
+
+
+    #Evaluate on multiple test sets: #Only do this at the end!
+    evaluate_on_multiple_test_sets(model, test_sets, num_classes=2, version=version)
+    val_dataloader = DataLoader(test_data, batch_size=default_batch_size) #Load data for report at the end.
+    generate_classification_report(model, val_dataloader, num_classes=2, version=version) #Final report at the end.

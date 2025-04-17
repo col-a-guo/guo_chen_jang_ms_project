@@ -53,7 +53,7 @@ all_features = [
     "scarcity", "nonuniform_progress", "performance_constraints", "user_heterogeneity",
     "cognitive", "external", "internal", "coordination", "transactional", "technical",
     "demand"
-] + list(bottid_df.columns) # Add one-hot encoded column names
+] #+ list(bottid_df.columns) # Add one-hot encoded column names
 
 # Ensure all features are present in the data; otherwise, add with default 0
 for feature in all_features:
@@ -76,15 +76,6 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_
 # Define the estimator
 estimators = [('rf', RandomForestClassifier(n_estimators=10, random_state=42))]
 
-# Define Stacking Classifier
-# clf = StackingClassifier(
-#     estimators=estimators,
-#     final_estimator=make_pipeline(
-#         PolynomialFeatures(degree=2),
-#         MinMaxScaler(),
-#         LogisticRegression(penalty='l2', solver="saga", max_iter=10000)
-#     )
-# )
 
 clf = RandomForestClassifier(n_estimators=10, random_state=42)
 
@@ -98,7 +89,7 @@ def calculate_permutation_importance(clf, X_train, y_train):
 def print_classification_report(clf, X_test, y_test, dataset_name):
     y_pred = clf.predict(X_test)
     print(f"Classification Report for {dataset_name}:")
-    print(classification_report(y_test, y_pred))
+    print(classification_report(y_test, y_pred, digits=4))
 
 # Train and evaluate the model
 clf.fit(X_train, y_train)

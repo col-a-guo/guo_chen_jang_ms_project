@@ -43,7 +43,7 @@ def load_model_and_tokenizer(model_version):
             return None, None
     return MODEL_CACHE[(model_version, "model")], MODEL_CACHE[(model_version, "tokenizer")]
 
-def predict(inputs, attention_mask=None):
+def predict(inputs, attention_mask=None, model_version=None):
     """
     Performs a forward pass of the current model and returns classification logits.
     """
@@ -53,7 +53,7 @@ def predict(inputs, attention_mask=None):
     return output.logits
 
 
-def classification_forward_func(inputs, attention_mask=None, class_ind=0):
+def classification_forward_func(inputs, attention_mask=None, class_ind=0, model_version=None):
     """
     Custom forward function to access a specific class's logit for the current model.
     """
@@ -75,7 +75,7 @@ def update_global_token_ids():
         sep_token_id = current_tokenizer.sep_token_id
         cls_token_id = current_tokenizer.cls_token_id
 
-def construct_input_ref_pair(text, ref_token_id, sep_token_id, cls_token_id):
+def construct_input_ref_pair(text, ref_token_id, sep_token_id, cls_token_id, model_version):
     """
     Constructs input and reference token ID pairs for sequence classification using the current tokenizer.
     """
@@ -116,9 +116,9 @@ def visualize(text, ground_truth_class=0):
     probabilities = torch.softmax(logits, dim=1)
     predicted_class = torch.argmax(probabilities).item()
 
-    print('Text: ', text)
-    print('Predicted Class: ', predicted_class)
-    print('Probabilities: ', probabilities)
+    print(f'Model: {model_version}, Text: ', text)
+    print(f'Model: {model_version}, Predicted Class: ', predicted_class)
+    print(f'Model: {model_version}, Probabilities: ', probabilities)
 
     # Re-initialize LayerIntegratedGradients with the current model
     lig = LayerIntegratedGradients(classification_forward_func, current_model.bert.embeddings)
@@ -137,6 +137,7 @@ def visualize(text, ground_truth_class=0):
 
     attributions_sum = summarize_attributions(attributions)
 
+    predicted_probability = probabilities[:, predicted_class].item()
     predicted_probability = probabilities[:, predicted_class].item()
 
     vis_data_record = viz.VisualizationDataRecord(
