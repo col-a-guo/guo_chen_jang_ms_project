@@ -25,9 +25,9 @@ print(f"Using device: {device}")
 torch.manual_seed(seed_value)
 torch.cuda.manual_seed_all(seed_value)  
 
-version_list = ["bottleneckBERT", "businessBERT", "bert-uncased"]  # Updated version list
+version_list = ["bottleneckBERT", "businessBERT", "bert-uncased"]  
 
-# Default hyperparameters (removed Optuna)
+# Default hyperparameters
 default_lr = 5e-5 #initial learning rate
 target_lr = 8e-6 #Target after 10 epochs
 default_eps = 6.748313060587885e-08
@@ -36,16 +36,16 @@ num_epochs = 20
 patience = 4 
 warmup_proportion = 0.2
 
-# Function to generate classification report for multi-class
+# function to generate classification report for multi-class
 def generate_classification_report(model, dataloader, num_classes, epoch=None, version=None, split_name="Test"):
     model.eval()
     all_preds = []
     all_labels = []
-    with torch.no_grad(): #Run once, don't update gradients during reporting
+    with torch.no_grad(): #run once, don't update gradients during reporting
         for batch in dataloader:
-            input_ids, attention_mask, features, bottid_encoded, labels = [t.to(device) for t in batch] #Unpack bottid because one hot encoded
-            logits = model(input_ids, attention_mask, features, bottid_encoded) # Pass bottid to model
-            preds = torch.argmax(logits, dim=1)  # Multi-class prediction
+            input_ids, attention_mask, features, bottid_encoded, labels = [t.to(device) for t in batch] #unpack bottid because one hot encoded
+            logits = model(input_ids, attention_mask, features, bottid_encoded) # pass bottid to model
+            preds = torch.argmax(logits, dim=1)  # multi-class prediction
             all_preds.extend(preds.cpu().numpy())
             all_labels.extend(labels.cpu().numpy())
 
@@ -54,8 +54,7 @@ def generate_classification_report(model, dataloader, num_classes, epoch=None, v
     all_labels = np.array(all_labels)
 
     report = classification_report(all_labels, all_preds, target_names=[str(i) for i in range(num_classes)], digits=4) 
-    
-    # Full confusion matrix with correct spacing
+
     cm = confusion_matrix(all_labels, all_preds, labels=list(range(num_classes)))
     cm_report = "\nConfusion Matrix:\n"
     cm_report += "            Predicted\n"
@@ -83,15 +82,15 @@ Classification Report ({split_name}, Version: {version}, Epoch {epoch if epoch i
 def create_test_sets(test_dataset, num_sets=10, subset_size=0.9):
     """
     Splits the test set into `num_sets` subsets, each containing `subset_size` proportion
-    of the data for each label, for Monte Carlo cross validation
+    of the data for each label, for Monte Carlo cross validation (MCCV)
 
     Args:
-        test_dataset: The PyTorch Dataset representing the test set.
-        num_sets: The number of test subsets to create.
-        subset_size: The proportion of each label to include in each subset (e.g., 0.2 for 20%).
+        test_dataset: your test dataset
+        num_sets: int, the number of test subsets to create.
+        subset_size: 0<float<1, proportion of subset (e.g., 0.2 for 20%).
 
     Returns:
-        A list of PyTorch Subsets, each representing a test subset.
+        test_sets: subsets of your test dataset
     """
 
     # Get indices of samples for each label
@@ -124,12 +123,12 @@ def evaluate_on_multiple_test_sets(model, test_sets, num_classes=2, version=None
 
     Args:
         model: The trained PyTorch model.
-        test_sets: A list of PyTorch Subsets, each representing a test subset.
-        num_classes: The number of classes in the classification problem.
-        version: The version of the model for reporting purposes.
+        test_sets: test subsets from create_testsets
+        num_classes: int, for classification
+        version: str, for recording versions
 
     Returns:
-        A dictionary containing the average classification report metrics and standard deviations.
+        results: dict containing the average classification report metrics and standard deviations.
     """
 
     all_reports = []
@@ -184,8 +183,7 @@ def evaluate_on_multiple_test_sets(model, test_sets, num_classes=2, version=None
     return results
 
 
-
-# Define the model architecture 
+#main model architecture
 class BertClassifier(nn.Module, PyTorchModelHubMixin):
     def __init__(self, version, num_labels=1, freeze_bert=False, num_bottid_categories=29): 
         super(BertClassifier, self).__init__()
@@ -207,7 +205,7 @@ class BertClassifier(nn.Module, PyTorchModelHubMixin):
             nn.ReLU()
         )
 
-        #First linear layer, bottids sent to 8 params (less than key features to emphasize it less)
+        #First linear layer, bottids sent to 8 params (less than key features, emphasized/explored less than others)
         self.linear_bottid = nn.Sequential(
             nn.Linear(num_bottid_categories, 8),  # Linear layer for bottid encoding
             nn.ReLU()
@@ -221,19 +219,19 @@ class BertClassifier(nn.Module, PyTorchModelHubMixin):
 
         #Second linear layer, concatenate first layer -> 32
         self.linear_combined_layer = nn.Sequential(
-            nn.Linear(128 + 16 + 8, 32), #Concatenate additional features here
+            nn.Linear(128 + 16 + 8, 32),
             nn.ReLU())
         
         self.final_classifier = nn.Linear(32, num_labels)
 
-        self.pooling = nn.AdaptiveAvgPool1d(1) # Global average pooling layer
+        self.pooling = nn.AdaptiveAvgPool1d(1) # Global avg pool
 
 
         if freeze_bert:
             for param in self.bert.parameters():
                 param.requires_grad = False
 
-    #TODO: Add bottleneck features here
+    #TODO: Add bottleneck features here?
                 #feedforward, sequential, 11 -> 8 -> num_labels, concatenate with pooled
                 #try simple concatenate, then try lower weight/layer down to 128, 64, etc
                 #try business, our bert, hybridization, ??
@@ -242,7 +240,7 @@ class BertClassifier(nn.Module, PyTorchModelHubMixin):
                 
     def forward(self, input_ids, attention_mask, features, bottid_encoded): # Take bottid as input
         outputs = self.bert(input_ids=input_ids, attention_mask=attention_mask)
-        # Global average pooling
+        # Global abg pool
         last_hidden_state = outputs.last_hidden_state
         pooled_output = self.pooling(last_hidden_state.permute(0, 2, 1)).squeeze(-1)
         
@@ -275,11 +273,9 @@ def load_tokenizer(version):
 ogpath = "feb_20_stitched.csv"
 dataset = load_dataset('csv', data_files={'train': "train_" + ogpath, 'test': "test_" + ogpath})
 
-# Load the CSVs into pandas to encode bottid correctly, then pass back into the HF dataset.
 train_df = pd.read_csv("train_" + ogpath)
 test_df = pd.read_csv("test_" + ogpath)
 
-#One-Hot-Encode the bottid features
 encoder = OneHotEncoder(handle_unknown='ignore')
 
 encoder.fit(train_df[['bottid']])
@@ -296,7 +292,7 @@ feature_names = [f"bottid_{i}" for i in range(train_encoded.shape[1])]
 train_encoded_df = pd.DataFrame(train_encoded, columns=feature_names)
 test_encoded_df = pd.DataFrame(test_encoded, columns=feature_names)
 
-#Concatenate new onehot-encoded columns onto original dataframe
+
 train_df = pd.concat([train_df, train_encoded_df], axis=1)
 test_df = pd.concat([test_df, test_encoded_df], axis=1)
 
@@ -307,7 +303,6 @@ test_df = test_df.drop('bottid', axis=1)
 #Convert the dataframes back to HuggingFace datasets
 dataset['train'] = dataset['train'].from_pandas(train_df)
 dataset['test'] = dataset['test'].from_pandas(test_df)
-
 
 # Truncate dataset; useful to avoid resampling errors due to requesting more samples than exist
 # also reducing to very small numbers for rapid prototyping/testing
@@ -348,7 +343,6 @@ class CustomDataset(Dataset):
 
         return input_ids, attention_mask, features, bottid_encoded, label # Returns bottid encoding, label
 
-# Learning Rate Scheduler: Exponential Decay with Linear Warmup
 def get_exponential_warmup_schedule(optimizer, warmup_steps, initial_lr, target_lr, num_epochs, total_steps):
     """
     Combines a linear warmup with an exponential decay to reach a target learning rate

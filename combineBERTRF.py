@@ -43,21 +43,9 @@ features = [
     "demand", "label", "bottid", "word_count",
 ]
 
-# Control variables (no longer used, so kept empty)
+# Control variables (Note: word_count used in quad features. Could also use length_approx, source)
 control_vars = []
 
-
-# Prepare dataset
-def preprocess_data(data, add_length_approx=True):
-    data = data.fillna(0)
-    # Check if 'length_approx' exists in the dataset
-    if add_length_approx:
-        if "length_approx" in data.columns:
-            data["length_approx"] = 0  # Set 'length_approx' column to 0 if it exists
-    return data
-
-
-combined = preprocess_data(combined, add_length_approx=False)
 
 # Remove rows where label is 2.0
 combined = combined[combined["label"] != 2.0]
@@ -69,7 +57,7 @@ bottid_df = pd.DataFrame(bottid_encoded, columns=encoder.get_feature_names_out([
 combined = pd.concat([combined.reset_index(drop=True), bottid_df], axis=1)
 combined = combined.drop('bottid', axis=1)  # Drop original 'bottid' column
 
-# Prepare data - dynamically determine the feature list after one-hot encoding
+# Prepare data - determine the feature list after one-hot encoding
 all_features = [
     "scarcity", "nonuniform_progress", "performance_constraints", "user_heterogeneity",
     "cognitive", "external", "internal", "coordination", "transactional", "technical",
@@ -81,12 +69,11 @@ for feature in all_features:
     if feature not in combined.columns:
         combined[feature] = 0
 
-
+#minmax scale
 def prepare_X_data(data, all_features):
     X = data[all_features]
     scaler = MinMaxScaler()
     return pd.DataFrame(scaler.fit_transform(X), columns=X.columns)
-
 
 X = prepare_X_data(combined, all_features)  # Pass all features after one-hot encoding
 y = combined["label"]
@@ -97,16 +84,13 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_
 # Define the estimator
 estimators = [('rf', RandomForestClassifier(n_estimators=10, random_state=42))]
 
-
 clf = RandomForestClassifier(n_estimators=10, random_state=42)
-
 
 # Function to calculate permutation importance
 def calculate_permutation_importance(clf, X_train, y_train):
     clf.fit(X_train, y_train)
     result = permutation_importance(clf, X_train, y_train, n_repeats=8, random_state=42)
     return result.importances_mean
-
 
 # Function to print classification report
 def print_classification_report(clf, X_test, y_test, dataset_name):
@@ -137,6 +121,10 @@ selected_features = list(X.columns[top_feature_indices])  # Get names of top 12 
 print("Selected Features:", selected_features)
 
 
+#############################START BERT MODEL CODE#############################
+
+#Note: Almost identical to BERTearnings.py, so comments are sparse
+
 seed_value = 1
 random.seed(seed_value)
 np.random.seed(seed_value)
@@ -153,7 +141,7 @@ default_lr = 5e-5 #initial learning rate
 default_eps = 6.748313060587885e-08
 default_batch_size = 32
 num_epochs = 20
-patience = 4 #For early stopping
+patience = 4 
 target_lr = 8e-6 #Target after 10 epochs
 warmup_proportion = 0.2
 
@@ -201,7 +189,7 @@ Classification Report (Version: {version}, Epoch {epoch if epoch is not None els
     f1 = classification_report(all_labels, all_preds, target_names=[str(i) for i in range(num_classes)], output_dict=True, zero_division=0)['macro avg']['f1-score'] # Added zero_division
 
     return f1
-# Modified BertClassifier
+
 class BertClassifier(nn.Module, PyTorchModelHubMixin):
 # Define the model architecture (using global pooling for all versions)class BertClassifier(nn.Module, PyTorchModelHubMixin):
     def __init__(self, version, num_labels=1, freeze_bert=False, selected_feature_count=12): # ADDED: selected_feature_count
@@ -218,17 +206,17 @@ class BertClassifier(nn.Module, PyTorchModelHubMixin):
 
         self.version = version
 
-        self.linear_features = nn.Sequential( #MODIFIED:  No hardcoding
+        self.linear_features = nn.Sequential( 
             nn.Linear(selected_feature_count, 16),
             nn.ReLU()
-        )
+        ) #use selected features -> 16 instead of key + bottid -> 16 + 8
 
         self.cls_head = nn.Sequential(
             nn.Linear(self.bert.config.hidden_size, 128),
             nn.ReLU()
         )
 
-        self.linear_combined_layer = nn.Sequential( #MODIFIED: Updated input size
+        self.linear_combined_layer = nn.Sequential(
             nn.Linear(128 + 16, 32),
             nn.ReLU()
         )
@@ -240,15 +228,15 @@ class BertClassifier(nn.Module, PyTorchModelHubMixin):
             for param in self.bert.parameters():
                 param.requires_grad = False
 
-    def forward(self, input_ids, attention_mask, selected_features): # MODIFIED: Only selected features
+    def forward(self, input_ids, attention_mask, selected_features): 
         outputs = self.bert(input_ids=input_ids, attention_mask=attention_mask)
         last_hidden_state = outputs.last_hidden_state
         pooled_output = self.pooling(last_hidden_state.permute(0, 2, 1)).squeeze(-1)
         bert_output = self.cls_head(pooled_output)
 
-        linear_features_output = self.linear_features(selected_features) # MODIFIED: Process only selected features
+        linear_features_output = self.linear_features(selected_features) 
 
-        combined_output = torch.cat((bert_output, linear_features_output), dim=1) #MODIFIED:  Concatenate only bert and processed features
+        combined_output = torch.cat((bert_output, linear_features_output), dim=1) 
         linear_layer_output = self.linear_combined_layer(combined_output)
         logits = self.final_classifier(linear_layer_output)
         return logits
@@ -280,7 +268,6 @@ test_df2 = pd.read_csv("test_" + ogpath2)
 train_df = pd.concat([train_df1, train_df2], ignore_index=True)
 test_df = pd.concat([test_df1, test_df2], ignore_index=True)
 
-#One-Hot-Encode the bottid features
 encoder = OneHotEncoder(handle_unknown='ignore')
 
 encoder.fit(train_df[['bottid']])
@@ -288,9 +275,6 @@ encoder.fit(train_df[['bottid']])
 train_encoded = encoder.transform(train_df[['bottid']]).toarray()
 test_encoded = encoder.transform(test_df[['bottid']]).toarray()
 
-# get_feature_names_out is deprecated, use get_feature_names instead
-# but this throws an error locally and I don't want to deal with this
-# feature_names = encoder.get_feature_names_out(['bottid'])
 feature_names = [f"bottid_{i}" for i in range(train_encoded.shape[1])]
 
 # create a temporary dataframe to store encoded values, with feature names
@@ -387,13 +371,13 @@ class CustomDataset(Dataset):
         # Extract and combine the selected features into a single tensor
         selected_feature_values = []
         for feature_name in self.selected_features:
-            selected_feature_values.append(item[feature_name]) #MODIFIED: Extract selected feature values
+            selected_feature_values.append(item[feature_name]) 
         
-        selected_features = torch.tensor(selected_feature_values, dtype=torch.float) # MODIFIED: Feature tensors
+        selected_features = torch.tensor(selected_feature_values, dtype=torch.float) 
 
-        return input_ids, attention_mask, selected_features, label # MODIFIED: Returns selected features, label
+        return input_ids, attention_mask, selected_features, label
 
-# --- Training Loop Modification ---
+# --- Training Loop ---
 for version in version_list:
     print(f"\n----- Running with {version} -----")
 
@@ -404,8 +388,8 @@ for version in version_list:
 
     num_bottid_categories = train_encoded.shape[1]
     # --- Pass selected_features to CustomDataset ---
-    train_data = CustomDataset(train_dataset, selected_features, bottid_categories=num_bottid_categories) #MODIFIED: Pass selected features
-    test_data = CustomDataset(test_dataset, selected_features, bottid_categories=num_bottid_categories) #MODIFIED: Pass selected features
+    train_data = CustomDataset(train_dataset, selected_features, bottid_categories=num_bottid_categories) 
+    test_data = CustomDataset(test_dataset, selected_features, bottid_categories=num_bottid_categories) 
 
     # (Undersampling and DataLoader setup remain similar)
 
@@ -413,7 +397,7 @@ for version in version_list:
     loss_fn = nn.CrossEntropyLoss(weight=normalized_weights.to(device))
 
     # --- Initialize Model with selected_feature_count ---
-    model = BertClassifier(version, num_labels=2, selected_feature_count=len(selected_features)).to(device) # MODIFIED: Initialize with feature count
+    model = BertClassifier(version, num_labels=2, selected_feature_count=len(selected_features)).to(device)
 
     train_dataloader = DataLoader(train_data, batch_size=default_batch_size, shuffle=True)
     test_dataloader = DataLoader(test_data, batch_size=default_batch_size)
@@ -432,7 +416,7 @@ for version in version_list:
         total_steps
     )
 
-    # --- Modify train_and_evaluate ---
+
     def train_and_evaluate(model, train_dataloader, val_dataloader, optimizer, warmup_scheduler, decay_scheduler, epochs, loss_fn, patience=4, num_classes=2, version=None):
         model.to(device)
         best_f1 = 0.0
@@ -449,9 +433,9 @@ for version in version_list:
             model.train()
             total_loss = 0
             for batch in train_dataloader:
-                input_ids, attention_mask, selected_features, labels = [t.to(device) for t in batch] #MODIFIED: Unpack only selected_features and label
+                input_ids, attention_mask, selected_features, labels = [t.to(device) for t in batch] 
                 model.zero_grad()
-                logits = model(input_ids, attention_mask, selected_features) #MODIFIED: Pass selected_features to model
+                logits = model(input_ids, attention_mask, selected_features)
                 loss = loss_fn(logits, labels)
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
@@ -471,8 +455,8 @@ for version in version_list:
             val_loss = 0
             with torch.no_grad():
                 for batch in val_dataloader:
-                    input_ids, attention_mask, selected_features, labels = [t.to(device) for t in batch] #MODIFIED: Unpack only selected_features and label
-                    logits = model(input_ids, attention_mask, selected_features) #MODIFIED: Pass selected_features to model
+                    input_ids, attention_mask, selected_features, labels = [t.to(device) for t in batch] 
+                    logits = model(input_ids, attention_mask, selected_features) 
                     val_loss += loss_fn(logits, labels).item()
 
             avg_val_loss = val_loss / len(val_dataloader)

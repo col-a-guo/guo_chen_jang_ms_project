@@ -21,7 +21,7 @@ MODEL_CACHE = {}
 current_model = None
 current_tokenizer = None
 current_model_version = None
-lig = None  # Initialize LayerIntegratedGradients outside
+lig = None  # Initialize LayerInt egratedGradients outside
 
 def load_model_and_tokenizer(model_version):
     """Loads the specified model and tokenizer, or retrieves from cache."""

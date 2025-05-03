@@ -1,15 +1,15 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-# Removed: from sklearn.ensemble import RandomForestClassifier, StackingClassifier
 from sklearn.preprocessing import PolynomialFeatures, MinMaxScaler, OneHotEncoder
 from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import train_test_split, ShuffleSplit
+from sklearn.model_selection import train_test_split
 from imblearn.over_sampling import RandomOverSampler
 from sklearn.metrics import classification_report, log_loss, accuracy_score
 from sklearn.inspection import permutation_importance
 from collections import defaultdict
 import warnings
+
 warnings.filterwarnings('ignore', category=FutureWarning) # Suppress some sklearn warnings
 warnings.filterwarnings('ignore', category=UserWarning) # Suppress some imblearn/sklearn warnings
 
@@ -30,9 +30,8 @@ def preprocess_and_train_single_split(X_train_raw, y_train_raw, X_test_raw, y_te
         tuple: (Classification report dict, permutation importance DataFrame, list of validation losses)
                Returns (None, None, None) if training fails (e.g., no features left).
     """
-    # --- Preprocessing specific to this split ---
 
-    # One-Hot Encode BottID - Fit on Training data ONLY to prevent leakage
+    # One-Hot Encode BottID 
     encoder = OneHotEncoder(sparse_output=False, handle_unknown='ignore')
     try:
         bottid_train_encoded = encoder.fit_transform(X_train_raw[['bottid']])
@@ -44,12 +43,11 @@ def preprocess_and_train_single_split(X_train_raw, y_train_raw, X_test_raw, y_te
         bottid_train_df = pd.DataFrame(index=X_train_raw.index)
         bottid_test_df = pd.DataFrame(index=X_test_raw.index)
 
-
     # Combine original features (excluding bottid) with encoded bottid
     X_train_pre = pd.concat([X_train_raw.drop('bottid', axis=1, errors='ignore'), bottid_train_df], axis=1)
     X_test_pre = pd.concat([X_test_raw.drop('bottid', axis=1, errors='ignore'), bottid_test_df], axis=1)
 
-    # Polynomial Features - Fit on Training data ONLY
+
     current_labels_for_quad = [col for col in labels_for_quad if col in X_train_pre.columns]
     if not current_labels_for_quad:
         print("Warning: No polynomial features found in training data for this split.")
@@ -84,18 +82,7 @@ def preprocess_and_train_single_split(X_train_raw, y_train_raw, X_test_raw, y_te
     train_cols = set(X_train_combined.columns)
     test_cols = set(X_test_combined.columns)
 
-    # Ensure shared columns are calculable
-    if not train_cols:
-         print("Error: No columns found in training data after preprocessing. Skipping split.")
-         return None, None, []
-    if not test_cols and len(X_test_combined) > 0: # Only warn if test set is not empty
-         print("Warning: No columns found in test data after preprocessing. Test evaluation might fail.")
 
-    shared_cols = list(train_cols.intersection(test_cols))
-    if not shared_cols and len(X_test_combined) > 0:
-        print("Warning: No shared columns between train and test after preprocessing. Test evaluation might fail.")
-        # Fallback? Maybe use train columns if test columns were completely lost?
-        shared_cols = list(train_cols)
 
 
     # Add missing columns to test set, fill with 0
@@ -103,11 +90,6 @@ def preprocess_and_train_single_split(X_train_raw, y_train_raw, X_test_raw, y_te
     for col in missing_in_test:
         X_test_combined[col] = 0
 
-    # Ensure same column order using shared_cols (or train_cols if shared is empty)
-    cols_to_use = shared_cols if shared_cols else list(train_cols) # Ensure we have a list of columns
-    if not cols_to_use:
-         print("Error: No features available for scaling. Skipping split.")
-         return None, None, []
 
     X_train_combined = X_train_combined[list(train_cols)] # Keep all training columns initially
     # Only select shared/train columns in test *after* adding missing ones
@@ -127,7 +109,7 @@ def preprocess_and_train_single_split(X_train_raw, y_train_raw, X_test_raw, y_te
 
     # --- Model Training and Feature Selection ---
 
-    # Create validation set FOR FEATURE SELECTION from the training data
+    # Create validation set for feature selection from the training data
     val_test_size = 0.20
     min_samples_for_split = 2
     if len(X_train_scaled) < min_samples_for_split * (1/val_test_size) or len(np.unique(y_train_raw)) < 2:
@@ -150,7 +132,7 @@ def preprocess_and_train_single_split(X_train_raw, y_train_raw, X_test_raw, y_te
             X_train_fs, X_val_fs, y_train_fs, y_val_fs = X_train_scaled, X_train_scaled, y_train_raw, y_train_raw
 
 
-    # Oversample the training part *after* splitting validation set
+    # Oversample the training part after splitting validation set
     if len(np.unique(y_train_fs)) > 1:
         ros = RandomOverSampler(random_state=random_state_base + 1, sampling_strategy='auto')
         try:
@@ -163,8 +145,6 @@ def preprocess_and_train_single_split(X_train_raw, y_train_raw, X_test_raw, y_te
         X_train_oversampled, y_train_oversampled = X_train_fs, y_train_fs
 
 
-    # --- Define the Logistic Regression model FOR FEATURE SELECTION ---
-    # Removed RandomForestClassifier and StackingClassifier
     lr_fs = LogisticRegression(penalty='l2', solver='saga', max_iter=5000, random_state=random_state_base+4)
 
     # --- Iterative feature dropping ---
@@ -177,63 +157,26 @@ def preprocess_and_train_single_split(X_train_raw, y_train_raw, X_test_raw, y_te
     best_features = surviving_features[:]
     best_loss = float('inf')
     no_improvement_count = 0
-    patience = 10 # Reduced patience slightly
+    patience = 10 #High patience because it seems to get better randomly
     all_val_losses = []
     min_features_to_keep = 5 # Stop if less than 5 features remain
 
     iteration = 0
     while len(surviving_features) > min_features_to_keep:
         iteration += 1
-        #print(f"  FS Iteration {iteration}, Features: {len(surviving_features)}") # Optional detailed logging
 
         # Select current features
         X_train_fs_current = X_train_oversampled[surviving_features]
         X_val_fs_current = X_val_fs[surviving_features]
 
-        # Train on oversampled training data
-        if X_train_fs_current.empty or y_train_oversampled.empty:
-             print("Warning: Empty data for training in feature selection. Stopping.")
-             break
-        try:
-            # Fit the Logistic Regression model directly
-            lr_fs.fit(X_train_fs_current, y_train_oversampled)
-        except ValueError as e:
-             print(f"Error fitting Logistic Regression during FS: {e}. Stopping feature selection.")
-             # This might happen if a feature becomes constant after oversampling/splitting
-             # Revert to previous best features if possible
-             surviving_features = best_features[:]
-             break
-        except Exception as e: # Catch other unexpected errors during fit
-             print(f"Unexpected error fitting Logistic Regression during FS: {e}. Stopping.")
-             surviving_features = best_features[:]
-             break
+        lr_fs.fit(X_train_fs_current, y_train_oversampled)
 
-
-        # Evaluate on validation data (not oversampled)
-        if X_val_fs_current.empty or y_val_fs.empty:
-             print("Warning: Empty data for validation in feature selection. Stopping.")
-             break
 
         # Check if predict_proba is possible (needs >1 class)
-        try:
-             if len(lr_fs.classes_) > 1:
-                 y_pred_proba = lr_fs.predict_proba(X_val_fs_current)
-                 val_loss = log_loss(y_val_fs, y_pred_proba, labels=lr_fs.classes_)
-             else: # Cannot calculate log_loss with only one predicted class
-                 y_pred = lr_fs.predict(X_val_fs_current)
-                 val_loss = 1.0 - accuracy_score(y_val_fs, y_pred) # Use 1-accuracy as loss proxy
-                 print(f"  Warning: Only one class predicted, using 1-accuracy ({val_loss:.4f}) as validation loss.")
+        y_pred_proba = lr_fs.predict_proba(X_val_fs_current)
+        val_loss = log_loss(y_val_fs, y_pred_proba, labels=lr_fs.classes_)
 
-             all_val_losses.append(val_loss)
-             #print(f"  FS Iteration {iteration}: Val Loss = {val_loss:.4f}") # Optional detailed logging
-        except ValueError as e:
-            print(f"Error calculating validation loss: {e}. Stopping feature selection.")
-            surviving_features = best_features[:] # Revert
-            break
-        except Exception as e: # Catch other potential errors during prediction/loss calc
-             print(f"Unexpected error during validation eval: {e}. Stopping feature selection.")
-             surviving_features = best_features[:] # Revert
-             break
+        all_val_losses.append(val_loss)
 
 
         if val_loss < best_loss:
@@ -244,119 +187,65 @@ def preprocess_and_train_single_split(X_train_raw, y_train_raw, X_test_raw, y_te
             no_improvement_count += 1
 
         if no_improvement_count >= patience:
-            #print(f"  FS early stopping triggered after {patience} iterations.")
+            print(f"FS early stopping triggered after {patience} iterations.")
             break
 
         # Permutation importance on validation set using the Logistic Regression model
-        try:
-            perm_importance = permutation_importance(lr_fs, X_val_fs_current, y_val_fs, n_repeats=3, random_state=random_state_base+5, n_jobs=-1) # Parallelize
-            importance_df = pd.DataFrame({
-                'Feature': surviving_features,
-                'Importance': perm_importance.importances_mean
-            }).sort_values(by='Importance', ascending=True)
-        except Exception as e:
-            print(f"Error calculating permutation importance: {e}. Stopping feature selection.")
-            surviving_features = best_features[:] # Revert
-            break
+        perm_importance = permutation_importance(lr_fs, X_val_fs_current, y_val_fs, n_repeats=3, random_state=random_state_base+5, n_jobs=-1) # Parallelize
+        importance_df = pd.DataFrame({
+            'Feature': surviving_features,
+            'Importance': perm_importance.importances_mean
+        }).sort_values(by='Importance', ascending=True)
 
         # Drop features
         num_features_to_drop = max(1, int(len(surviving_features) * 0.10))
         # Ensure we don't try to drop more features than available minus the minimum required
         num_features_to_drop = min(num_features_to_drop, len(surviving_features) - min_features_to_keep)
         if num_features_to_drop <= 0:
-             #print("  No more features to drop while respecting min_features_to_keep.")
+             print("  No more features to drop while respecting min_features_to_keep.")
              break
 
         features_to_drop = importance_df.head(num_features_to_drop)['Feature'].tolist()
         surviving_features = [f for f in surviving_features if f not in features_to_drop]
 
-        if len(surviving_features) < min_features_to_keep: # Should not happen if logic above is correct, but keep as safeguard
-            #print("  Reached minimum feature limit.")
-            break
 
     # Use the best features found
     final_features = best_features
-    if not final_features:
-        print("Error: No features survived the selection process. Skipping split.")
-        return None, None, all_val_losses
-
-    #print(f"  Selected {len(final_features)} features: {final_features}")
+    print(f"  Selected {len(final_features)} features: {final_features}")
 
 
     # --- Final Model Training and Evaluation on Test Set ---
 
-    # Train FINAL model on the FULL (but oversampled) training set using selected features
+    # Train final model on full (but oversampled) training set using selected features
     X_train_final_base, y_train_final_base = X_train_scaled, y_train_raw # Start with original scaled train data for this split
 
-    # Ensure the training data used for final model has the selected features
-    if not all(f in X_train_final_base.columns for f in final_features):
-         missing_final_feats = [f for f in final_features if f not in X_train_final_base.columns]
-         print(f"Error: Final selected features {missing_final_feats} not found in final training data. Skipping split.")
-         return None, None, all_val_losses
     X_train_final_subset = X_train_final_base[final_features]
 
 
     # Oversample the *entire* training set (with selected features) for the final model fit
-    if len(np.unique(y_train_final_base)) > 1:
-        ros_final = RandomOverSampler(random_state=random_state_base + 6, sampling_strategy='auto')
-        try:
-             X_train_oversampled_final, y_train_oversampled_final = ros_final.fit_resample(X_train_final_subset, y_train_final_base)
-        except ValueError:
-             print("Warning: Oversampling failed for final model. Using original training data.")
-             X_train_oversampled_final, y_train_oversampled_final = X_train_final_subset, y_train_final_base
-    else:
-        print("Warning: Only one class in training data for final model. Using original training data.")
-        X_train_oversampled_final, y_train_oversampled_final = X_train_final_subset, y_train_final_base
+    ros_final = RandomOverSampler(random_state=random_state_base + 6, sampling_strategy='auto')
+    X_train_oversampled_final, y_train_oversampled_final = ros_final.fit_resample(X_train_final_subset, y_train_final_base)
 
-
-    # --- Define the FINAL Logistic Regression model ---
-    # Removed RandomForestClassifier and StackingClassifier
+    # --- Define the final Logistic Regression model ---
     lr_final = LogisticRegression(penalty='l2', solver='saga', max_iter=10000, random_state=random_state_base+8)
 
-    try:
-        # Fit the final Logistic Regression model directly
-        lr_final.fit(X_train_oversampled_final, y_train_oversampled_final)
-    except ValueError as e:
-        print(f"Error fitting final Logistic Regression classifier: {e}. Skipping split.")
-        return None, None, all_val_losses
-    except Exception as e:
-        print(f"Unexpected error fitting final model: {e}. Skipping split.")
-        return None, None, all_val_losses
+    # Fit the final Logistic Regression model directly
+    lr_final.fit(X_train_oversampled_final, y_train_oversampled_final)
 
 
-    # Evaluate on the TEST set (never seen before, not oversampled)
-    # Ensure test set has the final selected features
-    if not all(f in X_test_scaled.columns for f in final_features):
-        missing_test_feats = [f for f in final_features if f not in X_test_scaled.columns]
-        print(f"Error: Final selected features {missing_test_feats} not found in test data. Cannot evaluate.")
-        # Attempt to create a dummy report/importance or return None
-        report_dict = classification_report(y_test_raw, [], output_dict=True, zero_division=0) # Empty predictions
-        final_importance_df = pd.DataFrame({'Feature': final_features, 'Importance': 0})
-        return report_dict, final_importance_df, all_val_losses # Return with empty/zero results
-
+    # Evaluate on the test set (never seen before, not oversampled)
 
     X_test_final = X_test_scaled[final_features] # Select features in test set
 
-    if X_test_final.empty or y_test_raw.empty:
-        print("Warning: Empty test data after feature selection. Cannot evaluate.")
-        report_dict = {}
-        final_importance_df = pd.DataFrame({'Feature': final_features, 'Importance': 0})
-    else:
-        try:
-            # Predict using the final Logistic Regression model
-            y_pred = lr_final.predict(X_test_final)
-            report_dict = classification_report(y_test_raw, y_pred, output_dict=True, zero_division=0)
+    y_pred = lr_final.predict(X_test_final)
+    report_dict = classification_report(y_test_raw, y_pred, output_dict=True, zero_division=0)
 
-            # Final permutation importance on TEST set using the final Logistic Regression model
-            perm_importance_final = permutation_importance(lr_final, X_test_final, y_test_raw, n_repeats=5, random_state=random_state_base+9, n_jobs=-1) # parallelize
-            final_importance_df = pd.DataFrame({
-                'Feature': final_features,
-                'Importance': perm_importance_final.importances_mean
-            }).sort_values(by='Importance', ascending=False)
-        except Exception as e:
-             print(f"Error during final evaluation or importance calculation: {e}")
-             report_dict = {} # Empty report on error
-             final_importance_df = pd.DataFrame({'Feature': final_features, 'Importance': 0}) # Zero importance
+    # Final permutation importance on test set using the final Logistic Regression model
+    perm_importance_final = permutation_importance(lr_final, X_test_final, y_test_raw, n_repeats=5, random_state=random_state_base+9, n_jobs=-1) # parallelize
+    final_importance_df = pd.DataFrame({
+        'Feature': final_features,
+        'Importance': perm_importance_final.importances_mean
+    }).sort_values(by='Importance', ascending=False)
 
 
     return report_dict, final_importance_df, all_val_losses
@@ -365,11 +254,7 @@ def preprocess_and_train_single_split(X_train_raw, y_train_raw, X_test_raw, y_te
 # --- Main Execution ---
 if __name__ == '__main__':
     # Load dataset
-    try:
-        combined = pd.read_csv("feb_20_combined.csv")
-    except FileNotFoundError:
-        print("Error: feb_20_combined.csv not found. Please ensure the file is in the correct directory.")
-        exit()
+    combined = pd.read_csv("feb_20_combined.csv")
 
     # --- Initial Data Cleaning and Preparation (Done Once) ---
     # Define all features potentially used (including OHE base, controls, poly bases)
@@ -379,13 +264,6 @@ if __name__ == '__main__':
     required_columns = potential_features + ['label']
 
     missing_req = [col for col in required_columns if col not in combined.columns and col != 'label'] # Check only features
-    if 'label' not in combined.columns:
-         raise ValueError("Required target column 'label' missing from the dataset.")
-    if missing_req:
-        print(f"Warning: Potential feature columns missing, they will be treated as 0 or ignored if not generated: {missing_req}")
-        # Add missing feature columns filled with 0
-        for col in missing_req:
-             combined[col] = 0
 
     # Convert 'label' to numeric, coercing errors and dropping resulting NaNs
     combined['label'] = pd.to_numeric(combined['label'], errors='coerce')
@@ -404,12 +282,6 @@ if __name__ == '__main__':
 
     # Drop rows where label == 2
     combined = combined[combined['label'] != 2].reset_index(drop=True) # Reset index after filtering
-
-    # Check if data remains after cleaning
-    if combined.empty:
-        raise ValueError("Dataset is empty after initial cleaning (label == 2 removal or NaN label dropping). Cannot proceed.")
-    if len(combined['label'].unique()) < 2:
-        raise ValueError(f"Dataset has only one class ({combined['label'].unique()}) after cleaning. Cannot perform binary classification.")
 
 
     # Define feature groups
@@ -436,8 +308,6 @@ if __name__ == '__main__':
 
     # Separate features (X) and target (y) once
     feature_columns_exist = [col for col in combined.columns if col != 'label']
-    if not feature_columns_exist:
-         raise ValueError("No feature columns found in the dataset after preprocessing.")
     X = combined[feature_columns_exist]
     y = combined['label']
 
@@ -454,56 +324,25 @@ if __name__ == '__main__':
         np.random.seed(i) # Seed numpy for sampling indices
         n_total = len(combined)
         n_samples = int(n_total * sample_frac)
-        if n_samples < 2:
-             print(f"Warning: Sample size ({n_samples}) too small for split {i+1}. Skipping.")
-             continue
         sample_indices = np.random.choice(combined.index, size=n_samples, replace=False)
         data_sample = combined.loc[sample_indices]
 
-        if data_sample.empty or len(data_sample) < 2:
-             print(f"Warning: Sampled data is empty or too small for split {i+1}. Skipping.")
-             continue
-
         X_sample = data_sample.drop('label', axis=1)
         y_sample = data_sample['label']
-
-        # Check if the sample has at least two classes before splitting
-        if len(y_sample.unique()) < 2:
-             print(f"Warning: Sample for split {i+1} has only one class ({y_sample.unique()}). Skipping split.")
-             continue
 
         # 2. Split the 80% sample into Train (80% of sample) and Test (20% of sample)
         # Ensure test_size doesn't result in splits smaller than 1 sample per class for stratify
         min_test_samples = max(1, int(test_size_mccv * len(X_sample)))
         min_train_samples = len(X_sample) - min_test_samples
-        if min_train_samples < 1 or min_test_samples < 1:
-             print(f"Warning: Sample size too small ({len(X_sample)}) to create train/test split for fold {i+1}. Skipping.")
-             continue
 
-        try:
-            # Check if stratification is feasible
-            can_stratify = len(y_sample.unique()) > 1 and y_sample.value_counts().min() >= 2 # Need at least 2 samples of rarest class for test split stratification
-
-            if can_stratify:
-                X_train_raw, X_test_raw, y_train_raw, y_test_raw = train_test_split(
-                    X_sample, y_sample,
-                    test_size=test_size_mccv,
-                    random_state=i*42, # Vary random state for splitting
-                    stratify=y_sample # Stratify if possible
-                )
-            else:
-                 print(f"Warning: Cannot stratify main split {i+1} (single class or <2 samples in minority class). Using non-stratified split.")
-                 X_train_raw, X_test_raw, y_train_raw, y_test_raw = train_test_split(
-                    X_sample, y_sample,
-                    test_size=test_size_mccv,
-                    random_state=i*42
-                 )
-            # Store indices used in this test set
-            processed_indices.update(X_test_raw.index)
-
-        except ValueError as e_split:
-              print(f"Error: Could not split data for fold {i+1}: {e_split}. Skipping fold.")
-              continue
+        X_train_raw, X_test_raw, y_train_raw, y_test_raw = train_test_split(
+            X_sample, y_sample,
+            test_size=test_size_mccv,
+            random_state=i*42, # Vary random state for splitting
+            stratify=y_sample # Stratify if possible
+        )
+        
+        processed_indices.update(X_test_raw.index)
 
 
         print(f"  Train shape: {X_train_raw.shape}, Test shape: {X_test_raw.shape}")
@@ -536,128 +375,108 @@ if __name__ == '__main__':
     # --- Aggregation and Reporting ---
     print("\n--- MCCV Results (Using Logistic Regression Only) ---")
 
-    if not all_reports:
-        print("No successful MCCV splits completed. Cannot generate aggregate report.")
+    # Aggregate Classification Reports
+    avg_report = defaultdict(lambda: defaultdict(list))
+    metric_keys = ['precision', 'recall', 'f1-score', 'support']
+    valid_splits_count = len(all_reports)
+
+    # Collect metrics for each class and overall averages
+    for report in all_reports:
+        for label, metrics in report.items():
+            if isinstance(metrics, dict): # Class-specific metrics or macro/weighted avg dicts
+                for key in metric_keys:
+                    if key in metrics:
+                        # Support should be summed, not averaged directly if interpretation is total samples
+                        if key == 'support':
+                            avg_report[label][key].append(metrics[key]) # Collect individual supports
+                        else:
+                            avg_report[label][key].append(metrics[key])
+            elif label == 'accuracy': # Overall accuracy is usually a single float
+                    if isinstance(report[label], (float,int)):
+                        avg_report[label]['score'].append(report[label])
+
+
+    print(f"\nAverage Classification Report over {valid_splits_count} splits:")
+    final_avg_report = defaultdict(dict)
+
+    for label, metrics in avg_report.items():
+        print(f"  Class/Avg: {label}")
+        for key, values in metrics.items():
+            if not values: continue # Skip empty metrics
+            mean_val = np.mean(values)
+            std_val = np.std(values)
+            final_avg_report[label][f'{key}_mean'] = mean_val
+            final_avg_report[label][f'{key}_std'] = std_val
+            if key == 'support':
+                    print(f"    {key}: {mean_val:.1f} (+/- {std_val:.1f}) (Avg support per split)") # Clarify it's avg support
+            elif key == 'score': # For accuracy
+                    print(f"    {key}: {mean_val:.4f} (+/- {std_val:.4f})")
+            else:
+                    print(f"    {key}: {mean_val:.4f} (+/- {std_val:.4f})")
+
+
+    # Aggregate Feature Importances
+    print("\nAverage Feature Importance (based on splits where feature survived selection):")
+    agg_importance = []
+    for feature, imp_list in all_importances.items():
+        if imp_list: # Only consider features that appeared at least once
+            mean_imp = np.mean(imp_list)
+            std_imp = np.std(imp_list)
+            num_splits_present = len(imp_list)
+            agg_importance.append({'Feature': feature, 'Mean Importance': mean_imp, 'Std Importance': std_imp, 'Num Splits Present': num_splits_present})
+
+    if agg_importance:
+        importance_summary_df = pd.DataFrame(agg_importance).sort_values(by='Mean Importance', ascending=False)
+        print(importance_summary_df.to_string(index=False, float_format="%.5f")) # Print without index, better formatting
+
+        # Plot Aggregated Feature Importances
+        plt.figure(figsize=(12, max(6, len(importance_summary_df) * 0.3))) # Adjust height
+        top_n = min(30, len(importance_summary_df)) # Plot top 30 or fewer if less exist
+        plot_df = importance_summary_df.head(top_n)
+        plt.barh(plot_df['Feature'], plot_df['Mean Importance'], xerr=plot_df['Std Importance'], align='center', capsize=3, ecolor='grey')
+        plt.xlabel('Mean Permutation Importance (+/- Std Dev)')
+        plt.ylabel(f'Top {top_n} Features')
+        plt.title(f'Average Feature Importance over {valid_splits_count} MCCV Splits (Logistic Regression)')
+        plt.gca().invert_yaxis()
+        plt.tight_layout()
+        # Save the plot
+        plt.savefig("feature_importance_logistic_regression.png", dpi=300)
+        print("\nFeature importance plot saved as 'feature_importance_logistic_regression.png'")
+        plt.show() 
     else:
-        # Aggregate Classification Reports
-        avg_report = defaultdict(lambda: defaultdict(list))
-        metric_keys = ['precision', 'recall', 'f1-score', 'support']
-        valid_splits_count = len(all_reports)
-
-        # Collect metrics for each class and overall averages
-        for report in all_reports:
-            for label, metrics in report.items():
-                if isinstance(metrics, dict): # Class-specific metrics or macro/weighted avg dicts
-                    for key in metric_keys:
-                        if key in metrics:
-                           # Support should be summed, not averaged directly if interpretation is total samples
-                           if key == 'support':
-                               avg_report[label][key].append(metrics[key]) # Collect individual supports
-                           else:
-                               avg_report[label][key].append(metrics[key])
-                elif label == 'accuracy': # Overall accuracy is usually a single float
-                     if isinstance(report[label], (float,int)):
-                          avg_report[label]['score'].append(report[label])
+        print("No feature importances were recorded.")
 
 
-        print(f"\nAverage Classification Report over {valid_splits_count} splits:")
-        final_avg_report = defaultdict(dict)
+    # Plot Average Validation Loss Curve
+    if all_fold_val_losses:
+            
+        max_len = 0
+        valid_loss_lists = [losses for losses in all_fold_val_losses if losses] # Filter out empty lists
+        if valid_loss_lists:
+            max_len = max(len(losses) for losses in valid_loss_lists)
 
-        for label, metrics in avg_report.items():
-            print(f"  Class/Avg: {label}")
-            for key, values in metrics.items():
-                if not values: continue # Skip empty metrics
-                mean_val = np.mean(values)
-                std_val = np.std(values)
-                final_avg_report[label][f'{key}_mean'] = mean_val
-                final_avg_report[label][f'{key}_std'] = std_val
-                if key == 'support':
-                     print(f"    {key}: {mean_val:.1f} (+/- {std_val:.1f}) (Avg support per split)") # Clarify it's avg support
-                elif key == 'score': # For accuracy
-                     print(f"    {key}: {mean_val:.4f} (+/- {std_val:.4f})")
-                else:
-                     print(f"    {key}: {mean_val:.4f} (+/- {std_val:.4f})")
+        if max_len > 0:
+            padded_losses = []
+            for losses in valid_loss_lists:
+                    last_val = losses[-1]
+                    padded = losses + [last_val] * (max_len - len(losses))
+                    padded_losses.append(padded)
 
+            avg_losses = np.mean(padded_losses, axis=0)
+            std_losses = np.std(padded_losses, axis=0)
+            iterations = range(1, len(avg_losses) + 1)
 
-        # Aggregate Feature Importances
-        print("\nAverage Feature Importance (based on splits where feature survived selection):")
-        agg_importance = []
-        for feature, imp_list in all_importances.items():
-            if imp_list: # Only consider features that appeared at least once
-                mean_imp = np.mean(imp_list)
-                std_imp = np.std(imp_list)
-                num_splits_present = len(imp_list)
-                agg_importance.append({'Feature': feature, 'Mean Importance': mean_imp, 'Std Importance': std_imp, 'Num Splits Present': num_splits_present})
-
-        if agg_importance:
-            importance_summary_df = pd.DataFrame(agg_importance).sort_values(by='Mean Importance', ascending=False)
-            print(importance_summary_df.to_string(index=False, float_format="%.5f")) # Print without index, better formatting
-
-            # Plot Aggregated Feature Importances
-            plt.figure(figsize=(12, max(6, len(importance_summary_df) * 0.3))) # Adjust height
-            top_n = min(30, len(importance_summary_df)) # Plot top 30 or fewer if less exist
-            plot_df = importance_summary_df.head(top_n)
-            plt.barh(plot_df['Feature'], plot_df['Mean Importance'], xerr=plot_df['Std Importance'], align='center', capsize=3, ecolor='grey')
-            plt.xlabel('Mean Permutation Importance (+/- Std Dev)')
-            plt.ylabel(f'Top {top_n} Features')
-            plt.title(f'Average Feature Importance over {valid_splits_count} MCCV Splits (Logistic Regression)')
-            plt.gca().invert_yaxis()
+            plt.figure(figsize=(10, 6))
+            plt.plot(iterations, avg_losses, label='Mean Validation Loss', marker='.', linestyle='-')
+            plt.fill_between(iterations, avg_losses - std_losses, avg_losses + std_losses, alpha=0.2, label='+/- 1 Std Dev')
+            plt.xlabel("Feature Dropping Iteration")
+            plt.ylabel("Average Validation Log Loss")
+            plt.title("Average Validation Loss During Iterative Feature Dropping (MCCV - Logistic Regression)")
+            plt.legend()
+            plt.grid(True, linestyle='--', alpha=0.6)
             plt.tight_layout()
-            # Save the plot
-            try:
-                plt.savefig("feature_importance_logistic_regression.png", dpi=300)
-                print("\nFeature importance plot saved as 'feature_importance_logistic_regression.png'")
-            except Exception as e:
-                print(f"\nCould not save feature importance plot: {e}")
-            plt.show() # Still display it
-        else:
-            print("No feature importances were recorded.")
-
-
-        # Plot Average Validation Loss Curve
-        if all_fold_val_losses:
-            try:
-                max_len = 0
-                valid_loss_lists = [losses for losses in all_fold_val_losses if losses] # Filter out empty lists
-                if valid_loss_lists:
-                     max_len = max(len(losses) for losses in valid_loss_lists)
-
-                if max_len > 0:
-                    padded_losses = []
-                    for losses in valid_loss_lists:
-                         last_val = losses[-1]
-                         padded = losses + [last_val] * (max_len - len(losses))
-                         padded_losses.append(padded)
-
-                    if padded_losses: # Check if we have data after padding attempt
-                        avg_losses = np.mean(padded_losses, axis=0)
-                        std_losses = np.std(padded_losses, axis=0)
-                        iterations = range(1, len(avg_losses) + 1)
-
-                        plt.figure(figsize=(10, 6))
-                        plt.plot(iterations, avg_losses, label='Mean Validation Loss', marker='.', linestyle='-')
-                        plt.fill_between(iterations, avg_losses - std_losses, avg_losses + std_losses, alpha=0.2, label='+/- 1 Std Dev')
-                        plt.xlabel("Feature Dropping Iteration")
-                        plt.ylabel("Average Validation Log Loss")
-                        plt.title("Average Validation Loss During Iterative Feature Dropping (MCCV - Logistic Regression)")
-                        plt.legend()
-                        plt.grid(True, linestyle='--', alpha=0.6)
-                        plt.tight_layout()
-                         # Save the plot
-                        try:
-                            plt.savefig("validation_loss_curve_logistic_regression.png", dpi=300)
-                            print("Validation loss curve plot saved as 'validation_loss_curve_logistic_regression.png'")
-                        except Exception as e:
-                            print(f"Could not save validation loss curve plot: {e}")
-                        plt.show() # Still display it
-                    else:
-                        print("\nCould not plot average validation loss (no valid loss data after filtering/padding).")
-                else:
-                     print("\nCould not plot average validation loss (feature selection did not run sufficiently in any split).")
-
-            except Exception as e:
-                print(f"\nError plotting average validation loss: {e}")
-
-
+            plt.savefig("validation_loss_curve_logistic_regression.png", dpi=300)
+            print("Validation loss curve plot saved as 'validation_loss_curve_logistic_regression.png'")
+            plt.show() 
     print(f"\nTotal unique data points used in test sets across all folds: {len(processed_indices)} out of {len(combined)}")
     print(f"Total number of successful splits aggregated: {len(all_reports)}")
