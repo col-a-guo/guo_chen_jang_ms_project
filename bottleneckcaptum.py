@@ -1,9 +1,9 @@
 
 import numpy as np
 import pandas as pd
-# import seaborn as sns # Not used in the final code, can be removed if not needed elsewhere
-# import matplotlib.pyplot as plt # Not used in the final code, can be removed if not needed elsewhere
-from lxml import html as lxml_html
+import seaborn as sns
+import matplotlib.pyplot as plt
+
 import torch
 import torch.nn as nn
 
@@ -13,7 +13,6 @@ from captum.attr import visualization as viz
 from captum.attr import LayerConductance, LayerIntegratedGradients
 
 import gradio as gr
-from bs4 import BeautifulSoup # Import BeautifulSoup
 
 device = torch.device("cpu")
 
@@ -28,11 +27,8 @@ def load_model_and_tokenizer(model_version):
     """Loads the specified model and tokenizer, or retrieves from cache."""
     global MODEL_CACHE
     if (model_version, "model") not in MODEL_CACHE:
-        # Adjust path if necessary, assuming they are in subfolders like 'models/bert-uncased_finetune_feb24'
-        # Or if using Hugging Face Hub paths like 'colaguo/bert-uncased_finetune_feb24'
         model_name = f"colaguo/{model_version}_finetune_feb24"
         try:
-            print(f"Attempting to load: {model_name}")
             config = BertConfig.from_pretrained(model_name)
             model = BertForSequenceClassification.from_pretrained(model_name, config=config, ignore_mismatched_sizes=True)
             tokenizer = BertTokenizer.from_pretrained(model_name, ignore_mismatched_sizes=True)
@@ -64,8 +60,7 @@ def classification_forward_func(inputs, attention_mask=None, class_ind=0, model_
     pred = predict(inputs, attention_mask=attention_mask)
     if pred is None:
         return None
-    # Return the probability of the target class
-    return torch.softmax(pred, dim=1)[:, class_ind]
+    return torch.softmax(pred, dim=1)[:, class_ind] # Access logit for class_ind
 
 
 ref_token_id = None
@@ -94,85 +89,11 @@ def construct_input_ref_pair(text, ref_token_id, sep_token_id, cls_token_id, mod
     # construct reference token ids
     ref_input_ids = [cls_token_id] + [ref_token_id] * len(text_ids) + [sep_token_id]
 
-    # Ensure tensors have at least one dimension if text is empty
-    if not input_ids:
-        print("Warning: Empty text resulted in empty token sequence.")
-        # Handle appropriately, maybe return empty tensors or raise error
-        # For now, let's create minimal valid tensors if possible
-        input_ids = [cls_token_id, sep_token_id]
-        ref_input_ids = [cls_token_id, sep_token_id]
-
-
     return torch.tensor([input_ids], device=device), torch.tensor([ref_input_ids], device=device)
 
 
 def construct_attention_mask(input_ids):
     return torch.ones_like(input_ids)
-
-
-def remove_attribution_label_column(html_content):
-    """Uses BeautifulSoup to remove the 'Attribution Label' column from Captum's HTML table."""
-    soup = BeautifulSoup(html_content, 'html.parser')
-    table = soup.find('table')
-
-    if not table:
-        print("Warning: Could not find table in Captum HTML output.")
-        return html_content # Return original if no table found
-
-    target_header_text = "Attribution Label"
-    target_header_index = -1
-
-    # Find header index and remove the header cell
-    thead = table.find('thead')
-    header_row = None
-    if thead:
-        header_row = thead.find('tr')
-        if header_row:
-            header_cells = header_row.find_all('th')
-            for i, th in enumerate(header_cells):
-                if th.get_text(strip=True) == target_header_text:
-                    target_header_index = i
-                    th.decompose() # Remove the header cell
-                    break
-
-    # Fallback if no thead or header not found in thead
-    if target_header_index == -1:
-        first_row = table.find('tr') # Assume first row might contain headers
-        if first_row:
-            header_cells = first_row.find_all('th')
-            if header_cells: # Check if it actually has th elements
-                 for i, th in enumerate(header_cells):
-                     if th.get_text(strip=True) == target_header_text:
-                        target_header_index = i
-                        th.decompose()
-                        break
-
-    if target_header_index == -1:
-        print(f"Warning: '{target_header_text}' header not found. Cannot remove column.")
-        # Optionally, inspect the first few td elements of the first row if no th exists
-        # This is less robust as structure might vary significantly
-        return str(soup) # Return HTML modified so far (or original if no table found)
-
-    # Remove data cells in the corresponding column
-    tbody = table.find('tbody')
-    if tbody:
-        data_rows = tbody.find_all('tr')
-        for row in data_rows:
-            cells = row.find_all('td')
-            if len(cells) > target_header_index:
-                cells[target_header_index].decompose()
-    # Handle case where data rows might be directly under table (no tbody)
-    else:
-        data_rows = table.find_all('tr')
-        # Skip header row if it was found earlier
-        start_index = 1 if header_row else 0
-        for row in data_rows[start_index:]:
-            cells = row.find_all('td')
-            if len(cells) > target_header_index:
-                cells[target_header_index].decompose()
-
-
-    return str(soup) # Return the modified HTML string
 
 
 def visualize(text, ground_truth_class=0):
@@ -191,10 +112,9 @@ def visualize(text, ground_truth_class=0):
 
     logits = predict(input_ids, attention_mask=attention_mask)
     if logits is None:
-        return f"Error during prediction for {model_version}."
+        return "Error during prediction."
     probabilities = torch.softmax(logits, dim=1)
-    predicted_class = torch.argmax(probabilities, dim=1).item() # Use dim=1 and .item()
-    predicted_probability = probabilities[0, predicted_class].item() # Index correctly
+    predicted_class = torch.argmax(probabilities).item()
 
     print(f'Model: {model_version}, Text: ', text)
     print(f'Model: {model_version}, Predicted Class: ', predicted_class)
@@ -212,7 +132,7 @@ def visualize(text, ground_truth_class=0):
     def summarize_attributions(attributions):
         attributions = attributions.sum(dim=-1).squeeze(0)
         attributions = attributions / torch.norm(attributions)
-        return attributions.cpu().detach() # Move to CPU and detach
+        return attributions
 
 
     attributions_sum = summarize_attributions(attributions)
@@ -221,23 +141,17 @@ def visualize(text, ground_truth_class=0):
     predicted_probability = probabilities[:, predicted_class].item()
 
     vis_data_record = viz.VisualizationDataRecord(
-                            word_attributions=attributions_sum, # Use named arg for clarity
-                            pred_prob=predicted_probability,
-                            pred_class=predicted_class,
-                            true_class=ground_truth_class,
-                            attr_label=str(ground_truth_class), # This is the label we want to remove
-                            attr_score=attributions_sum.sum().item(), # Use .item()
-                            raw_input_ids=all_tokens, # Use named arg
-                            convergence_score=delta.item()) # Use named arg and .item()
+                            attributions_sum,
+                            predicted_probability,
+                            predicted_class,
+                            ground_truth_class,  # Show ground truth as well
+                            str(ground_truth_class),
+                            attributions_sum.sum(),
+                            all_tokens,
+                            delta)
 
-    # Generate the original HTML visualization
-    html_obj = viz.visualize_text([vis_data_record])
-    original_html = html_obj.data
-
-    # Remove the "Attribution Label" column using BeautifulSoup
-    modified_html = remove_attribution_label_column(original_html)
-
-    return modified_html # Return the modified HTML string
+    html = viz.visualize_text([vis_data_record])
+    return html.data
 
 def switch_model(model_version):
     """Switches the currently active model and tokenizer."""
