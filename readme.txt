@@ -6,4 +6,4 @@ BERTgetpretraintxt.py is set up for local and here for viewing purposes, it won'
 
 Push to Hub won't work without huggingface login.
 
-All code is original; some AI assistance, especially on data cleaning/processing parts.
+All code is original; some AI assistance, especially on rote tasks (e.g. data cleaning, visualization, baseline comments) but minimal for important parts (i.e. the actual models, specific comments)

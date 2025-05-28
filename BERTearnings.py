@@ -43,8 +43,8 @@ def generate_classification_report(model, dataloader, num_classes, epoch=None, v
     all_labels = []
     with torch.no_grad(): #run once, don't update gradients during reporting
         for batch in dataloader:
-            input_ids, attention_mask, features, bottid_encoded, labels = [t.to(device) for t in batch] #unpack bottid because one hot encoded
-            logits = model(input_ids, attention_mask, features, bottid_encoded) # pass bottid to model
+            input_ids, attention_mask, features, Bottid_encoded, labels = [t.to(device) for t in batch] #unpack Bottid because one hot encoded
+            logits = model(input_ids, attention_mask, features, Bottid_encoded) # pass Bottid to model
             preds = torch.argmax(logits, dim=1)  # multi-class prediction
             all_preds.extend(preds.cpu().numpy())
             all_labels.extend(labels.cpu().numpy())
@@ -96,19 +96,22 @@ def create_test_sets(test_dataset, num_sets=10, subset_size=0.9):
     # Get indices of samples for each label
     label_0_indices = [i for i, item in enumerate(test_dataset) if item[-1] == 0] #item[-1] is label
     label_1_indices = [i for i, item in enumerate(test_dataset) if item[-1] == 1]
+    label_2_indices = [i for i, item in enumerate(test_dataset) if item[-1] == 2]  # Added for label 2
 
     # Calculate the number of samples to select for each label in each subset
     num_label_0_samples = int(len(label_0_indices) * subset_size)
     num_label_1_samples = int(len(label_1_indices) * subset_size)
+    num_label_2_samples = int(len(label_2_indices) * subset_size)  # Added for label 2
 
     test_sets = []
     for _ in range(num_sets):
         # Randomly select indices for each label
         subset_label_0_indices = random.sample(label_0_indices, num_label_0_samples)
         subset_label_1_indices = random.sample(label_1_indices, num_label_1_samples)
+        subset_label_2_indices = random.sample(label_2_indices, num_label_2_samples)  # Added for label 2
 
         # Combine the indices
-        subset_indices = subset_label_0_indices + subset_label_1_indices
+        subset_indices = subset_label_0_indices + subset_label_1_indices + subset_label_2_indices  # Added label_2
         random.shuffle(subset_indices)  # Shuffle the combined indices
 
         # Create a Subset from the selected indices
@@ -117,7 +120,7 @@ def create_test_sets(test_dataset, num_sets=10, subset_size=0.9):
 
     return test_sets
 
-def evaluate_on_multiple_test_sets(model, test_sets, num_classes=2, version=None):
+def evaluate_on_multiple_test_sets(model, test_sets, num_classes=3, version=None):
     """
     Evaluates the model on multiple test sets and calculates the average performance and standard deviations.
 
@@ -185,7 +188,7 @@ def evaluate_on_multiple_test_sets(model, test_sets, num_classes=2, version=None
 
 #main model architecture
 class BertClassifier(nn.Module, PyTorchModelHubMixin):
-    def __init__(self, version, num_labels=1, freeze_bert=False, num_bottid_categories=29): 
+    def __init__(self, version, num_labels=3, freeze_bert=False, num_Bottid_categories=29): 
         super(BertClassifier, self).__init__()
 
         if version == "bert-uncased":
@@ -205,9 +208,9 @@ class BertClassifier(nn.Module, PyTorchModelHubMixin):
             nn.ReLU()
         )
 
-        #First linear layer, bottids sent to 8 params (less than key features, emphasized/explored less than others)
-        self.linear_bottid = nn.Sequential(
-            nn.Linear(num_bottid_categories, 8),  # Linear layer for bottid encoding
+        #First linear layer, Bottids sent to 8 params (less than key features, emphasized/explored less than others)
+        self.linear_Bottid = nn.Sequential(
+            nn.Linear(num_Bottid_categories, 8),  # Linear layer for Bottid encoding
             nn.ReLU()
         )
 
@@ -238,7 +241,7 @@ class BertClassifier(nn.Module, PyTorchModelHubMixin):
                 #focus on / find tokens with captum?
                 #check library for past reports maybe
                 
-    def forward(self, input_ids, attention_mask, features, bottid_encoded): # Take bottid as input
+    def forward(self, input_ids, attention_mask, features, Bottid_encoded): # Take Bottid as input
         outputs = self.bert(input_ids=input_ids, attention_mask=attention_mask)
         # Global abg pool
         last_hidden_state = outputs.last_hidden_state
@@ -247,9 +250,9 @@ class BertClassifier(nn.Module, PyTorchModelHubMixin):
         bert_output = self.cls_head(pooled_output)
 
         linear_features_output = self.linear_features(features)
-        bottid_output = self.linear_bottid(bottid_encoded) # Pass bottid through linear layer
+        Bottid_output = self.linear_Bottid(Bottid_encoded) # Pass Bottid through linear layer
 
-        combined_output = torch.cat((bert_output, linear_features_output, bottid_output), dim=1) #Concatenate 3 inputs
+        combined_output = torch.cat((bert_output, linear_features_output, Bottid_output), dim=1) #Concatenate 3 inputs
 
         linear_layer_output = self.linear_combined_layer(combined_output)
 
@@ -270,7 +273,7 @@ def load_tokenizer(version):
         raise ValueError(f"Invalid model version: {version}")
 
 # Load dataset and preprocess
-ogpath = "feb_20_stitched.csv"
+ogpath = "may_24_combined.csv"
 dataset = load_dataset('csv', data_files={'train': "train_" + ogpath, 'test': "test_" + ogpath})
 
 train_df = pd.read_csv("train_" + ogpath)
@@ -278,15 +281,15 @@ test_df = pd.read_csv("test_" + ogpath)
 
 encoder = OneHotEncoder(handle_unknown='ignore')
 
-encoder.fit(train_df[['bottid']])
+encoder.fit(train_df[['Bottid']])
 
-train_encoded = encoder.transform(train_df[['bottid']]).toarray()
-test_encoded = encoder.transform(test_df[['bottid']]).toarray()
+train_encoded = encoder.transform(train_df[['Bottid']]).toarray()
+test_encoded = encoder.transform(test_df[['Bottid']]).toarray()
 
 # get_feature_names_out is deprecated, warning says to use get_feature_names instead
 # but this throws an error locally and I don't want to deal with it
-# using manual for bottid
-feature_names = [f"bottid_{i}" for i in range(train_encoded.shape[1])]
+# using manual for Bottid
+feature_names = [f"Bottid_{i}" for i in range(train_encoded.shape[1])]
 
 # create a temporary dataframe to store encoded values, with feature names
 train_encoded_df = pd.DataFrame(train_encoded, columns=feature_names)
@@ -296,9 +299,9 @@ test_encoded_df = pd.DataFrame(test_encoded, columns=feature_names)
 train_df = pd.concat([train_df, train_encoded_df], axis=1)
 test_df = pd.concat([test_df, test_encoded_df], axis=1)
 
-# Remove the original bottid column
-train_df = train_df.drop('bottid', axis=1)
-test_df = test_df.drop('bottid', axis=1)
+# Remove the original Bottid column
+train_df = train_df.drop('Bottid', axis=1)
+test_df = test_df.drop('Bottid', axis=1)
 
 #Convert the dataframes back to HuggingFace datasets
 dataset['train'] = dataset['train'].from_pandas(train_df)
@@ -313,20 +316,21 @@ def truncate_dataset(dataset):
 
 dataset = {k: truncate_dataset(v) for k, v in dataset.items()}
 
-# Filter out label 2 (shakeout stage)
-def filter_label_2(dataset):
-    filtered_dataset = dataset.filter(lambda example: example['label'] != 2)
-    return filtered_dataset
+# No longer filtering out label 2.  Need to keep it now
 
-dataset = {k: filter_label_2(v) for k, v in dataset.items()}
+#def filter_label_2(dataset):
+#    filtered_dataset = dataset.filter(lambda example: example['label'] != 2)
+#    return filtered_dataset
+
+#dataset = {k: filter_label_2(v) for k, v in dataset.items()}
 
 def tokenize_function(examples, tokenizer):
     return tokenizer(examples["paragraph"], padding="max_length", truncation=True, max_length=512)
 
 class CustomDataset(Dataset):
-    def __init__(self, dataset, bottid_categories=29): #Added bottid_categories, 29 should be the #. of bottIDs; notably reduced from full list because of low/0 prevalence
+    def __init__(self, dataset, Bottid_categories=29): #Added Bottid_categories, 29 should be the #. of Bottids; notably reduced from full list because of low/0 prevalence
         self.dataset = dataset
-        self.bottid_categories = bottid_categories
+        self.Bottid_categories = Bottid_categories
 
     def __len__(self):
         return len(self.dataset)
@@ -338,10 +342,10 @@ class CustomDataset(Dataset):
         label = torch.tensor(item['label'], dtype=torch.long)
         features = torch.tensor([item['scarcity'], item['nonuniform_progress'], item['performance_constraints'], item['user_heterogeneity'], item['cognitive'], item['external'], item['internal'], item['coordination'], item['transactional'], item['technical'], item['demand']], dtype=torch.float)
 
-        # Extract the one-hot encoded bottid features
-        bottid_encoded = torch.tensor([item[f"bottid_{i}"] for i in range(self.bottid_categories)], dtype=torch.float)
+        # Extract the one-hot encoded Bottid features
+        Bottid_encoded = torch.tensor([item[f"Bottid_{i}"] for i in range(self.Bottid_categories)], dtype=torch.float)
 
-        return input_ids, attention_mask, features, bottid_encoded, label # Returns bottid encoding, label
+        return input_ids, attention_mask, features, Bottid_encoded, label # Returns Bottid encoding, label
 
 def get_exponential_warmup_schedule(optimizer, warmup_steps, initial_lr, target_lr, num_epochs, total_steps):
     """
@@ -374,7 +378,7 @@ def get_exponential_warmup_schedule(optimizer, warmup_steps, initial_lr, target_
     return warmup_scheduler, decay_scheduler
 
 # Training function
-def train_and_evaluate(model, train_dataloader, val_dataloader, optimizer, warmup_scheduler, decay_scheduler, epochs, loss_fn, patience=4, num_classes=2, version=None, test_sets=None):
+def train_and_evaluate(model, train_dataloader, val_dataloader, optimizer, warmup_scheduler, decay_scheduler, epochs, loss_fn, patience=4, num_classes=3, version=None, test_sets=None):
     model.to(device)
     best_f1 = 0.0
     patience_counter = 0
@@ -392,9 +396,9 @@ def train_and_evaluate(model, train_dataloader, val_dataloader, optimizer, warmu
         model.train()
         total_loss = 0
         for batch in train_dataloader:
-            input_ids, attention_mask, features, bottid_encoded, labels = [t.to(device) for t in batch] #Unpack bottid
+            input_ids, attention_mask, features, Bottid_encoded, labels = [t.to(device) for t in batch] #Unpack Bottid
             model.zero_grad()
-            logits = model(input_ids, attention_mask, features, bottid_encoded) #Pass bottid to model
+            logits = model(input_ids, attention_mask, features, Bottid_encoded) #Pass Bottid to model
             loss = loss_fn(logits, labels) #weighted CrossEntropyLoss
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
@@ -414,8 +418,8 @@ def train_and_evaluate(model, train_dataloader, val_dataloader, optimizer, warmu
         val_loss = 0
         with torch.no_grad():
             for batch in val_dataloader:
-                input_ids, attention_mask, features, bottid_encoded, labels = [t.to(device) for t in batch] #Unpack bottid
-                logits = model(input_ids, attention_mask, features, bottid_encoded) #Pass bottid to model
+                input_ids, attention_mask, features, Bottid_encoded, labels = [t.to(device) for t in batch] #Unpack Bottid
+                logits = model(input_ids, attention_mask, features, Bottid_encoded) #Pass Bottid to model
                 val_loss += loss_fn(logits, labels).item() #weighted CrossEntropyLoss
 
         avg_val_loss = val_loss / len(val_dataloader)
@@ -468,9 +472,9 @@ for version in version_list:
     train_dataset = tokenized_datasets["train"]
     test_dataset = tokenized_datasets["test"]
 
-    num_bottid_categories = train_encoded.shape[1] #Determine the number of bottid categories
-    train_data = CustomDataset(train_dataset, bottid_categories=num_bottid_categories) # pass to CustomDataset
-    test_data = CustomDataset(test_dataset, bottid_categories=num_bottid_categories) # pass to CustomDataset
+    num_Bottid_categories = train_encoded.shape[1] #Determine the number of Bottid categories
+    train_data = CustomDataset(train_dataset, Bottid_categories=num_Bottid_categories) # pass to CustomDataset
+    test_data = CustomDataset(test_dataset, Bottid_categories=num_Bottid_categories) # pass to CustomDataset
 
     #Create test sets:
     test_sets = create_test_sets(test_data)
@@ -498,11 +502,11 @@ for version in version_list:
     #test_dataloader = DataLoader(test_data, batch_size=default_batch_size) #No longer pass full dataloader
 
     #loss weights emphasizing stage 1 (smaller population) over stage 0
-    normalized_weights = torch.tensor([1.0, 1.2])
+    normalized_weights = torch.tensor([1.0, 1.2, 1.1])
     loss_fn = nn.CrossEntropyLoss(weight=normalized_weights.to(device))
     
     # Initialize Model
-    model = BertClassifier(version, num_labels=2, num_bottid_categories=num_bottid_categories).to(device) # Initialize before weights, pass num_bottid_categories here
+    model = BertClassifier(version, num_labels=3, num_Bottid_categories=num_Bottid_categories).to(device) # Initialize before weights, pass num_Bottid_categories here
 
     train_dataloader = train_data_loader
     val_dataloader = DataLoader(test_data, batch_size=default_batch_size) #Use full test_data as val for early stopping
@@ -525,9 +529,9 @@ for version in version_list:
     )
 
     #Train and evaluate
-    train_and_evaluate(model, train_dataloader, val_dataloader, optimizer, warmup_scheduler, decay_scheduler, epochs=num_epochs, loss_fn=loss_fn, num_classes=2, version=version, test_sets=test_sets)
+    train_and_evaluate(model, train_dataloader, val_dataloader, optimizer, warmup_scheduler, decay_scheduler, epochs=num_epochs, loss_fn=loss_fn, num_classes=3, version=version, test_sets=test_sets)
 
     #Evaluate on multiple test sets only after training + finding good model
-    evaluate_on_multiple_test_sets(model, test_sets, num_classes=2, version=version)
+    evaluate_on_multiple_test_sets(model, test_sets, num_classes=3, version=version)
     val_dataloader = DataLoader(test_data, batch_size=default_batch_size) 
-    generate_classification_report(model, val_dataloader, num_classes=2, version=version) #Final report at the end.
+    generate_classification_report(model, val_dataloader, num_classes=3, version=version) #Final report at the end.

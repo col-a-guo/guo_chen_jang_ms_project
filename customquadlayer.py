@@ -10,38 +10,28 @@ from sklearn.inspection import permutation_importance
 from collections import defaultdict
 import warnings
 
-warnings.filterwarnings('ignore', category=FutureWarning) # Suppress some sklearn warnings
-warnings.filterwarnings('ignore', category=UserWarning) # Suppress some imblearn/sklearn warnings
-
 def preprocess_and_train_single_split(X_train_raw, y_train_raw, X_test_raw, y_test_raw, labels_for_quad, control_features, random_state_base):
     """
-    Preprocesses data, trains a Logistic Regression model, and evaluates for a single MCCV split.
+    Preprocesses data, trains logreg model, and evaluates for a single MCCV split.
 
     Args:
-        X_train_raw (pd.DataFrame): Raw training features for this split.
-        y_train_raw (pd.Series): Raw training labels for this split.
-        X_test_raw (pd.DataFrame): Raw testing features for this split.
-        y_test_raw (pd.Series): Raw testing labels for this split.
-        labels_for_quad (list): List of feature names for polynomial transformation.
-        control_features (list): List of feature names to include directly.
-        random_state_base (int): Base random state for reproducibility within the split.
+        X_train_raw (pd.DataFrame)
+        y_train_raw (pd.Series)
+        X_test_raw (pd.DataFrame)
+        y_test_raw (pd.Series)
+        labels_for_quad (list): list of feature names for polynomial transformation.
+        control_features (list): list of feature names to include directly.
+        random_state_base (int): seed for random
 
     Returns:
         tuple: (Classification report dict, permutation importance DataFrame, list of validation losses)
-               Returns (None, None, None) if training fails (e.g., no features left).
     """
 
-    # One-Hot Encode BottID 
     encoder = OneHotEncoder(sparse_output=False, handle_unknown='ignore')
-    try:
-        bottid_train_encoded = encoder.fit_transform(X_train_raw[['bottid']])
-        bottid_train_df = pd.DataFrame(bottid_train_encoded, columns=encoder.get_feature_names_out(['bottid']), index=X_train_raw.index)
-        bottid_test_encoded = encoder.transform(X_test_raw[['bottid']]) # Use transform only
-        bottid_test_df = pd.DataFrame(bottid_test_encoded, columns=encoder.get_feature_names_out(['bottid']), index=X_test_raw.index)
-    except ValueError as e:
-        print(f"Warning: Error during OneHotEncoding 'bottid' (maybe not present?): {e}. Creating empty DataFrames.")
-        bottid_train_df = pd.DataFrame(index=X_train_raw.index)
-        bottid_test_df = pd.DataFrame(index=X_test_raw.index)
+    bottid_train_encoded = encoder.fit_transform(X_train_raw[['bottid']])
+    bottid_train_df = pd.DataFrame(bottid_train_encoded, columns=encoder.get_feature_names_out(['bottid']), index=X_train_raw.index)
+    bottid_test_encoded = encoder.transform(X_test_raw[['bottid']]) # Use transform only
+    bottid_test_df = pd.DataFrame(bottid_test_encoded, columns=encoder.get_feature_names_out(['bottid']), index=X_test_raw.index)
 
     # Combine original features (excluding bottid) with encoded bottid
     X_train_pre = pd.concat([X_train_raw.drop('bottid', axis=1, errors='ignore'), bottid_train_df], axis=1)
@@ -56,29 +46,21 @@ def preprocess_and_train_single_split(X_train_raw, y_train_raw, X_test_raw, y_te
         poly_feature_names = []
     else:
         poly = PolynomialFeatures(degree=2, include_bias=False)
-        # Ensure data passed to PolynomialFeatures is numeric and handle potential errors
-        try:
-             X_train_poly_subset = X_train_pre[current_labels_for_quad].apply(pd.to_numeric, errors='coerce').fillna(0)
-             X_test_poly_subset = X_test_pre[current_labels_for_quad].apply(pd.to_numeric, errors='coerce').fillna(0)
+        #force data to numeric
+        X_train_poly_subset = X_train_pre[current_labels_for_quad].apply(pd.to_numeric, errors='coerce').fillna(0)
+        X_test_poly_subset = X_test_pre[current_labels_for_quad].apply(pd.to_numeric, errors='coerce').fillna(0)
 
-             poly_features_train = poly.fit_transform(X_train_poly_subset)
-             poly_features_test = poly.transform(X_test_poly_subset)
-             poly_feature_names = poly.get_feature_names_out(current_labels_for_quad)
-             X_train_poly_df = pd.DataFrame(poly_features_train, columns=poly_feature_names, index=X_train_pre.index)
-             X_test_poly_df = pd.DataFrame(poly_features_test, columns=poly_feature_names, index=X_test_pre.index)
-        except Exception as e:
-             print(f"Error during PolynomialFeatures transformation: {e}. Skipping polynomial features for this split.")
-             X_train_poly_df = pd.DataFrame(index=X_train_pre.index)
-             X_test_poly_df = pd.DataFrame(index=X_test_pre.index)
-             poly_feature_names = []
-
+        poly_features_train = poly.fit_transform(X_train_poly_subset)
+        poly_features_test = poly.transform(X_test_poly_subset)
+        poly_feature_names = poly.get_feature_names_out(current_labels_for_quad)
+        X_train_poly_df = pd.DataFrame(poly_features_train, columns=poly_feature_names, index=X_train_pre.index)
+        X_test_poly_df = pd.DataFrame(poly_features_test, columns=poly_feature_names, index=X_test_pre.index)
 
     # Combine Polynomial and Control Features
     current_control_features = [col for col in control_features if col in X_train_pre.columns]
     X_train_combined = pd.concat([X_train_poly_df, X_train_pre[current_control_features]], axis=1)
     X_test_combined = pd.concat([X_test_poly_df, X_test_pre[current_control_features]], axis=1)
 
-    # Align columns after potential OHE differences - crucial!
     train_cols = set(X_train_combined.columns)
     test_cols = set(X_test_combined.columns)
 
@@ -91,14 +73,12 @@ def preprocess_and_train_single_split(X_train_raw, y_train_raw, X_test_raw, y_te
         X_test_combined[col] = 0
 
 
-    X_train_combined = X_train_combined[list(train_cols)] # Keep all training columns initially
-    # Only select shared/train columns in test *after* adding missing ones
+    X_train_combined = X_train_combined[list(train_cols)]
     X_test_combined = X_test_combined[list(train_cols)]
 
 
-    # Scaling - Fit on Training data ONLY
     scaler = MinMaxScaler()
-    # Handle potential all-zero columns or other scaling issues
+    # Handle potential all-zero columns (potentially unclean data)
     try:
         X_train_scaled = pd.DataFrame(scaler.fit_transform(X_train_combined), columns=X_train_combined.columns, index=X_train_combined.index)
         X_test_scaled = pd.DataFrame(scaler.transform(X_test_combined), columns=X_test_combined.columns, index=X_test_combined.index)
@@ -109,49 +89,25 @@ def preprocess_and_train_single_split(X_train_raw, y_train_raw, X_test_raw, y_te
 
     # --- Model Training and Feature Selection ---
 
-    # Create validation set for feature selection from the training data
+    # cross val sizes
     val_test_size = 0.20
-    min_samples_for_split = 2
-    if len(X_train_scaled) < min_samples_for_split * (1/val_test_size) or len(np.unique(y_train_raw)) < 2:
-         print("Warning: Not enough samples or classes in training data for validation split. Using full training set for validation.")
-         X_train_fs, X_val_fs, y_train_fs, y_val_fs = X_train_scaled, X_train_scaled, y_train_raw, y_train_raw
+    if len(np.unique(y_train_raw)) > 1 and y_train_raw.value_counts().min() >= 2: # Check min samples per class for stratify
+            X_train_fs, X_val_fs, y_train_fs, y_val_fs = train_test_split(
+                X_train_scaled, y_train_raw, test_size=val_test_size, random_state=random_state_base + 2, stratify=y_train_raw
+            )
     else:
-        # Check if stratification is possible
-        try:
-            if len(np.unique(y_train_raw)) > 1 and y_train_raw.value_counts().min() >= 2: # Check min samples per class for stratify
-                 X_train_fs, X_val_fs, y_train_fs, y_val_fs = train_test_split(
-                     X_train_scaled, y_train_raw, test_size=val_test_size, random_state=random_state_base + 2, stratify=y_train_raw
-                 )
-            else: # Cannot stratify or too few samples in a class
-                 print("Warning: Cannot stratify validation split (single class or too few samples). Using non-stratified split.")
-                 X_train_fs, X_val_fs, y_train_fs, y_val_fs = train_test_split(
-                    X_train_scaled, y_train_raw, test_size=val_test_size, random_state=random_state_base + 2
-                 )
-        except Exception as e: # Catch any other split errors
-            print(f"Error during validation split: {e}. Using full training set for validation.")
-            X_train_fs, X_val_fs, y_train_fs, y_val_fs = X_train_scaled, X_train_scaled, y_train_raw, y_train_raw
-
+         print("not enough samples??")
 
     # Oversample the training part after splitting validation set
     if len(np.unique(y_train_fs)) > 1:
         ros = RandomOverSampler(random_state=random_state_base + 1, sampling_strategy='auto')
-        try:
-             X_train_oversampled, y_train_oversampled = ros.fit_resample(X_train_fs, y_train_fs)
-        except ValueError:
-             print("Warning: Oversampling failed (likely due to single class or insufficient samples). Using original training data for feature selection.")
-             X_train_oversampled, y_train_oversampled = X_train_fs, y_train_fs
-    else:
-        print("Warning: Only one class in training data for feature selection. Skipping oversampling.")
-        X_train_oversampled, y_train_oversampled = X_train_fs, y_train_fs
+        X_train_oversampled, y_train_oversampled = ros.fit_resample(X_train_fs, y_train_fs)
 
 
     lr_fs = LogisticRegression(penalty='l2', solver='saga', max_iter=5000, random_state=random_state_base+4)
 
     # --- Iterative feature dropping ---
     initial_features = X_train_oversampled.columns.tolist()
-    if not initial_features:
-        print("Error: No features available at the start of iterative dropping. Skipping split.")
-        return None, None, []
 
     surviving_features = initial_features[:]
     best_features = surviving_features[:]
@@ -172,7 +128,6 @@ def preprocess_and_train_single_split(X_train_raw, y_train_raw, X_test_raw, y_te
         lr_fs.fit(X_train_fs_current, y_train_oversampled)
 
 
-        # Check if predict_proba is possible (needs >1 class)
         y_pred_proba = lr_fs.predict_proba(X_val_fs_current)
         val_loss = log_loss(y_val_fs, y_pred_proba, labels=lr_fs.classes_)
 
@@ -256,7 +211,7 @@ if __name__ == '__main__':
     # Load dataset
     combined = pd.read_csv("feb_20_combined.csv")
 
-    # --- Initial Data Cleaning and Preparation (Done Once) ---
+    # --- Initial Data Cleaning and Preparation ---
     # Define all features potentially used (including OHE base, controls, poly bases)
     potential_features = ['scarcity', 'nonuniform_progress', 'performance_constraints', 'user_heterogeneity',
                         'cognitive', 'external', 'internal', 'coordination', 'transactional', 'technical',

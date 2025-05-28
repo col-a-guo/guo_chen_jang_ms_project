@@ -82,8 +82,7 @@ def get_value(row, col):
 def main():
     # Define root paths
     root_paths = [
-        r"C:\Users\collinguo\Downloads\drive-download-20250224T225051Z-001",
-        r"C:\Users\collinguo\Downloads\drive-download-20250224T225749Z-001"
+        r"C:\Users\collinguo\Downloads\drive-download-20250526T145016Z-1-001"
     ]
 
     # Define standardized columns
@@ -100,7 +99,7 @@ def main():
 
     # 2. Process and Combine Excel Files
     all_dataframes = []
-    output_path = "feb_24_multichannel_combined.csv"  # Just the filename
+    output_path = "may_24_multichannel_combined.csv"  # Just the filename
 
     # Write header to CSV file only once at the beginning
     pd.DataFrame(columns=standardized_columns).to_csv(output_path, index=False)

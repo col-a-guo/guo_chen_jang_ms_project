@@ -5,8 +5,8 @@ import numpy as np
 
 # List of file paths
 og_paths = [
-    r"feb_24_multichannel_combined.csv",
-    r"feb_24_streaming_combined.csv"
+    r"may_24_multichannel_combined.csv",
+    r"may_24_streaming_combined.csv"
 ]
 
 # Initialize an empty list to hold dataframes
@@ -66,7 +66,6 @@ data = data.dropna(subset=['label']) # Drop rows where 'label' became NaN
 data['label'] = data['label'].apply(lambda x: 1.0 if abs(x - 1.5) < 0.1 else (0.0 if abs(x - 0.5) < 0.1 else x))
 data['label'] = data['label'].map(lambda x: f"{x:.1f}")
 
-data = data[data.label != "2.0"]
 # Columns to keep for further processing
 columns_to_keep = [
         "scarcity", "nonuniform_progress", "performance_constraints", "user_heterogeneity", 
@@ -74,7 +73,7 @@ columns_to_keep = [
         "demand",
         "paragraph", #Special
         "label", #Y
-        "bottid"
+        "Bottid"
         #"source", "length_approx", "singlebott" #Control/utility
 ]
 data = data[columns_to_keep].fillna(0)
@@ -99,11 +98,11 @@ data["number_of_types"] = data[type_columns].sum(axis=1) / 10
 print(data)
 
 # Save the combined data
-data.to_csv("feb_24_combined.csv", index=False)
+data.to_csv("may_24_combined.csv", index=False)
 
 # Split into train and test datasets
 train_df, test_df = train_test_split(data, test_size=0.3, random_state=1)
 
 # # Save the train and test datasets
-train_df.to_csv("train_feb_24_combined.csv", index=False)
-test_df.to_csv("test_feb_24_combined.csv", index=False)
+train_df.to_csv("train_may_24_combined.csv", index=False)
+test_df.to_csv("test_may_24_combined.csv", index=False)
