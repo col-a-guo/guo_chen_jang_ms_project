@@ -216,13 +216,13 @@ class BertClassifier(nn.Module, PyTorchModelHubMixin):
 
         #First linear layer, BERT output sent to 128 params, biggest part
         self.cls_head = nn.Sequential(
-            nn.Linear(self.bert.config.hidden_size, 128),
+            nn.Linear(self.bert.config.hidden_size, 256),
             nn.ReLU()
         )
 
         #Second linear layer, concatenate first layer -> 32
         self.linear_combined_layer = nn.Sequential(
-            nn.Linear(128 + 16 + 8, 32),
+            nn.Linear(256 + 16 + 8, 32),
             nn.ReLU())
         
         self.final_classifier = nn.Linear(32, num_labels)
@@ -272,17 +272,17 @@ def load_tokenizer(version):
     else:
         raise ValueError(f"Invalid model version: {version}")
 
-# Load dataset and preprocess
+# Load dataset and preprocess# Load dataset and preprocess
 ogpath = "may_24_combined.csv"
 dataset = load_dataset('csv', data_files={'train': "train_" + ogpath, 'test': "test_" + ogpath})
 
 train_df = pd.read_csv("train_" + ogpath)
 test_df = pd.read_csv("test_" + ogpath)
+test_df.loc[test_df['label'] > 2, 'label'] = 2  # Or remove rows, or re-assign as needed
 
 encoder = OneHotEncoder(handle_unknown='ignore')
 
 encoder.fit(train_df[['Bottid']])
-
 train_encoded = encoder.transform(train_df[['Bottid']]).toarray()
 test_encoded = encoder.transform(test_df[['Bottid']]).toarray()
 
@@ -501,8 +501,7 @@ for version in version_list:
     train_data_loader = DataLoader(train_data, batch_size=default_batch_size, shuffle=True)
     #test_dataloader = DataLoader(test_data, batch_size=default_batch_size) #No longer pass full dataloader
 
-    #loss weights emphasizing stage 1 (smaller population) over stage 0
-    normalized_weights = torch.tensor([1.0, 1.2, 1.1])
+    normalized_weights = torch.tensor([1.0, 1.2, 1.6])
     loss_fn = nn.CrossEntropyLoss(weight=normalized_weights.to(device))
     
     # Initialize Model
