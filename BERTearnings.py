@@ -175,7 +175,7 @@ if __name__ == "__main__":
         final_report = "Averaged performance across all test sets:\n"
         for metric_name, value in results.items():
             if "_avg" in metric_name:
-            std_name = metric_name.replace("_avg", "_std")
+                std_name = metric_name.replace("_avg", "_std")
             if std_name in results: # Check to make sure that we don't cause a key error
                 final_report += f"{metric_name}: {value:.4f} +/- {results[std_name]:.4f}\n"
 
@@ -199,7 +199,7 @@ if __name__ == "__main__":
             elif version == "bottleneckBERT":
                 self.bert = AutoModel.from_pretrained('colaguo/working')
             else:
-            raise ValueError(f"Invalid model version: {version}")
+                raise ValueError(f"Invalid model version: {version}")
             
             self.version = version 
             
