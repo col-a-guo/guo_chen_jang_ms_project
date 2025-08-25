@@ -311,7 +311,7 @@ if __name__ == "__main__":
     # Truncate dataset; useful to avoid resampling errors due to requesting more samples than exist
     # also reducing to very small numbers for rapid prototyping/testing
     def truncate_dataset(dataset):
-        k = round(len(dataset)*0.09)
+        k = round(len(dataset)*0.99)
         random_indices = random.sample(range(len(dataset)), k)
         return dataset.select(random_indices)
 
@@ -502,7 +502,7 @@ if __name__ == "__main__":
         train_data_loader = DataLoader(train_data, batch_size=default_batch_size, shuffle=True)
         #test_dataloader = DataLoader(test_data, batch_size=default_batch_size) #No longer pass full dataloader
 
-        normalized_weights = torch.tensor([1.0, 1.2, 1.6])
+        normalized_weights = torch.tensor([1.0, 1.2, 0.3])
         loss_fn = nn.CrossEntropyLoss(weight=normalized_weights.to(device))
         
         # Initialize Model
