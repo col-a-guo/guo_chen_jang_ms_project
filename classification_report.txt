@@ -55579,3 +55579,99 @@ Actual
       2   0    7    0
 
     
+
+    Classification Report (Val, Version: businessBERT, Epoch 1):
+
+                  precision    recall  f1-score   support
+
+           0     0.0000    0.0000    0.0000       506
+           1     0.5487    1.0000    0.7086       777
+           2     0.0000    0.0000    0.0000       133
+
+    accuracy                         0.5487      1416
+   macro avg     0.1829    0.3333    0.2362      1416
+weighted avg     0.3011    0.5487    0.3888      1416
+
+
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   0    506    0
+      1   0    777    0
+      2   0    133    0
+
+    
+
+    Classification Report (Val, Version: businessBERT, Epoch 2):
+
+                  precision    recall  f1-score   support
+
+           0     0.7069    0.5672    0.6294       506
+           1     0.6723    0.8739    0.7599       777
+           2     0.0000    0.0000    0.0000       133
+
+    accuracy                         0.6822      1416
+   macro avg     0.4597    0.4804    0.4631      1416
+weighted avg     0.6215    0.6822    0.6419      1416
+
+
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   287    219    0
+      1   98    679    0
+      2   21    112    0
+
+    
+
+    Classification Report (Val, Version: businessBERT, Epoch 3):
+
+                  precision    recall  f1-score   support
+
+           0     0.7354    0.6206    0.6731       506
+           1     0.6906    0.8790    0.7735       777
+           2     0.0000    0.0000    0.0000       133
+
+    accuracy                         0.7041      1416
+   macro avg     0.4753    0.4999    0.4822      1416
+weighted avg     0.6417    0.7041    0.6650      1416
+
+
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   314    192    0
+      1   94    683    0
+      2   19    114    0
+
+    
+
+    Classification Report (Val, Version: businessBERT, Epoch 4):
+
+                  precision    recall  f1-score   support
+
+           0     0.5936    0.7648    0.6684       506
+           1     0.7199    0.7079    0.7138       777
+           2     0.0000    0.0000    0.0000       133
+
+    accuracy                         0.6617      1416
+   macro avg     0.4378    0.4909    0.4607      1416
+weighted avg     0.6071    0.6617    0.6305      1416
+
+
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   387    119    0
+      1   227    550    0
+      2   38    95    0
+
+    

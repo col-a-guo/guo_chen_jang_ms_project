@@ -35,7 +35,6 @@ def process_excel_file(file_path, standardized_columns):
             'internet_infra': 'internet infra', # Corrected to standardized name
             'content_distribution': 'content distribution',# Corrected to standardized name
             'browsers,_apps_&_smart_devices': 'browsers, apps & smart devices', # Corrected to standardized name
-            # REMOVE VERSION FROM ALL DATA.
         }
 
         # Rename columns based on the mapping
@@ -82,7 +81,7 @@ def get_value(row, col):
 def main():
     # Define root paths
     root_paths = [
-        r"C:\Users\collinguo\Downloads\drive-download-20250526T145016Z-1-001"
+        r"C:\Users\bunju\OneDrive\Desktop\guo_chen_jang_ms_project\for_mcn_final"
     ]
 
     # Define standardized columns
@@ -99,15 +98,15 @@ def main():
 
     # 2. Process and Combine Excel Files
     all_dataframes = []
-    output_path = "may_24_multichannel_combined.csv"  # Just the filename
+    output_path = "sept1_multichannel_combined.csv"  # Just the filename
 
     # Write header to CSV file only once at the beginning
     pd.DataFrame(columns=standardized_columns).to_csv(output_path, index=False)
 
     for root_path in root_paths:
         # Search for all XLSX files within the root directory.
-        excel_files = glob.glob(os.path.join(root_path, "*/*.xlsx")) # This captures .xlsx files
-
+        excel_files =[r"for_mcn_final\2007_2023_MCN_final.xlsx"] # This captures .xlsx files
+        print(excel_files)
         for file_path in excel_files:
             print(f"Processing file: {file_path}")
             df = process_excel_file(file_path, standardized_columns)
