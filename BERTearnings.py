@@ -274,7 +274,7 @@ if __name__ == "__main__":
             raise ValueError(f"Invalid model version: {version}")
 
     # Load dataset and preprocess# Load dataset and preprocess
-    ogpath = "may_24_combined.csv"
+    ogpath = "sept1_combined.csv"
     dataset = load_dataset('csv', data_files={'train': "train_" + ogpath, 'test': "test_" + ogpath})
 
     train_df = pd.read_csv("train_" + ogpath)
@@ -502,7 +502,7 @@ if __name__ == "__main__":
         train_data_loader = DataLoader(train_data, batch_size=default_batch_size, shuffle=True)
         #test_dataloader = DataLoader(test_data, batch_size=default_batch_size) #No longer pass full dataloader
 
-        normalized_weights = torch.tensor([1.0, 1.2, 0.3])
+        normalized_weights = torch.tensor([1.0, 1.2, 1.6])
         loss_fn = nn.CrossEntropyLoss(weight=normalized_weights.to(device))
         
         # Initialize Model

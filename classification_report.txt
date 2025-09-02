@@ -55675,3 +55675,51 @@ Actual
       2   38    95    0
 
     
+
+    Classification Report (Val, Version: businessBERT, Epoch 1):
+
+                  precision    recall  f1-score   support
+
+           0     0.6555    1.0000    0.7919      1528
+           1     0.0000    0.0000    0.0000       657
+           2     0.0000    0.0000    0.0000       146
+
+    accuracy                         0.6555      2331
+   macro avg     0.2185    0.3333    0.2640      2331
+weighted avg     0.4297    0.6555    0.5191      2331
+
+
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1528    0    0
+      1   657    0    0
+      2   146    0    0
+
+    
+
+    Classification Report (Val, Version: businessBERT, Epoch 2):
+
+                  precision    recall  f1-score   support
+
+           0     0.7371    0.8442    0.7871      1528
+           1     0.4716    0.4170    0.4426       657
+           2     0.0000    0.0000    0.0000       146
+
+    accuracy                         0.6710      2331
+   macro avg     0.4029    0.4204    0.4099      2331
+weighted avg     0.6161    0.6710    0.6407      2331
+
+
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1290    238    0
+      1   383    274    0
+      2   77    69    0
+
+    
