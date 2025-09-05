@@ -26,14 +26,14 @@ if __name__ == "__main__":
     torch.manual_seed(seed_value)
     torch.cuda.manual_seed_all(seed_value)  
 
-    version_list = ["bottleneckBERT"]  
+    version_list = ["businessBERT", "bert-uncased"]  
 
     # Default hyperparameters
     default_lr = 5e-5 #initial learning rate
     target_lr = 8e-6 #Target after 10 epochs
     default_eps = 6.748313060587885e-08
     default_batch_size = 32
-    num_epochs = 20
+    num_epochs = 200
     patience = 4 
     warmup_proportion = 0.2
 
