@@ -26,7 +26,7 @@ if __name__ == "__main__":
     torch.manual_seed(seed_value)
     torch.cuda.manual_seed_all(seed_value)  
 
-    version_list = ["businessBERT", "bert-uncased"]  
+    version_list = ["bottleneckBERT"]  
 
     # Default hyperparameters
     default_lr = 5e-5 #initial learning rate
@@ -197,7 +197,7 @@ if __name__ == "__main__":
             elif version == "businessBERT":
                 self.bert = AutoModel.from_pretrained('pborchert/BusinessBERT')
             elif version == "bottleneckBERT":
-                self.bert = AutoModel.from_pretrained('colaguo/working')
+                self.bert = AutoModel.from_pretrained('colaguo/bottleneckBERTsmall')
             else:
                 raise ValueError(f"Invalid model version: {version}")
             

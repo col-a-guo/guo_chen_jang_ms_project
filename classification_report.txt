@@ -57531,3 +57531,943 @@ Actual
       2   57    34    55
 
     
+
+    Classification Report (Val, Version: bottleneckBERT, Epoch 1):
+
+                  precision    recall  f1-score   support
+
+           0     0.6555    1.0000    0.7919      1528
+           1     0.0000    0.0000    0.0000       657
+           2     0.0000    0.0000    0.0000       146
+
+    accuracy                         0.6555      2331
+   macro avg     0.2185    0.3333    0.2640      2331
+weighted avg     0.4297    0.6555    0.5191      2331
+
+
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1528    0    0
+      1   657    0    0
+      2   146    0    0
+
+    
+
+    Classification Report (Val, Version: bottleneckBERT, Epoch 2):
+
+                  precision    recall  f1-score   support
+
+           0     0.6555    1.0000    0.7919      1528
+           1     0.0000    0.0000    0.0000       657
+           2     0.0000    0.0000    0.0000       146
+
+    accuracy                         0.6555      2331
+   macro avg     0.2185    0.3333    0.2640      2331
+weighted avg     0.4297    0.6555    0.5191      2331
+
+
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1528    0    0
+      1   657    0    0
+      2   146    0    0
+
+    
+
+    Classification Report (Val, Version: bottleneckBERT, Epoch 3):
+
+                  precision    recall  f1-score   support
+
+           0     0.6555    1.0000    0.7919      1528
+           1     0.0000    0.0000    0.0000       657
+           2     0.0000    0.0000    0.0000       146
+
+    accuracy                         0.6555      2331
+   macro avg     0.2185    0.3333    0.2640      2331
+weighted avg     0.4297    0.6555    0.5191      2331
+
+
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1528    0    0
+      1   657    0    0
+      2   146    0    0
+
+    
+
+    Classification Report (Val, Version: bottleneckBERT, Epoch 4):
+
+                  precision    recall  f1-score   support
+
+           0     0.7234    0.8711    0.7904      1528
+           1     0.4929    0.3683    0.4216       657
+           2     0.0000    0.0000    0.0000       146
+
+    accuracy                         0.6748      2331
+   macro avg     0.4054    0.4131    0.4040      2331
+weighted avg     0.6131    0.6748    0.6369      2331
+
+
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1331    197    0
+      1   415    242    0
+      2   94    52    0
+
+    
+
+    Classification Report (Val, Version: bottleneckBERT, Epoch 5):
+
+                  precision    recall  f1-score   support
+
+           0     0.7835    0.8030    0.7931      1528
+           1     0.4915    0.5723    0.5288       657
+           2     0.0000    0.0000    0.0000       146
+
+    accuracy                         0.6877      2331
+   macro avg     0.4250    0.4584    0.4407      2331
+weighted avg     0.6521    0.6877    0.6690      2331
+
+
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1227    301    0
+      1   281    376    0
+      2   58    88    0
+
+    
+
+    Classification Report (Val, Version: bottleneckBERT, Epoch 6):
+
+                  precision    recall  f1-score   support
+
+           0     0.7630    0.8848    0.8194      1528
+           1     0.5898    0.4597    0.5167       657
+           2     0.3830    0.1233    0.1865       146
+
+    accuracy                         0.7173      2331
+   macro avg     0.5786    0.4893    0.5075      2331
+weighted avg     0.6904    0.7173    0.6944      2331
+
+
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1352    161    15
+      1   341    302    14
+      2   79    49    18
+
+    
+
+    Classification Report (Val, Version: bottleneckBERT, Epoch 7):
+
+                  precision    recall  f1-score   support
+
+           0     0.7936    0.8331    0.8129      1528
+           1     0.5449    0.5540    0.5494       657
+           2     0.3559    0.1438    0.2049       146
+
+    accuracy                         0.7113      2331
+   macro avg     0.5648    0.5103    0.5224      2331
+weighted avg     0.6961    0.7113    0.7006      2331
+
+
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1273    232    23
+      1   278    364    15
+      2   53    72    21
+
+    
+
+    Classification Report (Val, Version: bottleneckBERT, Epoch 8):
+
+                  precision    recall  f1-score   support
+
+           0     0.8010    0.8194    0.8101      1528
+           1     0.5383    0.5997    0.5673       657
+           2     0.5556    0.1370    0.2198       146
+
+    accuracy                         0.7147      2331
+   macro avg     0.6316    0.5187    0.5324      2331
+weighted avg     0.7116    0.7147    0.7047      2331
+
+
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1252    267    9
+      1   256    394    7
+      2   55    71    20
+
+    
+
+    Classification Report (Val, Version: bottleneckBERT, Epoch 9):
+
+                  precision    recall  f1-score   support
+
+           0     0.7644    0.9130    0.8321      1528
+           1     0.6815    0.4429    0.5369       657
+           2     0.3544    0.1918    0.2489       146
+
+    accuracy                         0.7353      2331
+   macro avg     0.6001    0.5159    0.5393      2331
+weighted avg     0.7153    0.7353    0.7124      2331
+
+
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1395    101    32
+      1   347    291    19
+      2   83    35    28
+
+    
+
+    Classification Report (Val, Version: bottleneckBERT, Epoch 10):
+
+                  precision    recall  f1-score   support
+
+           0     0.8118    0.8043    0.8080      1528
+           1     0.5522    0.6195    0.5839       657
+           2     0.3875    0.2123    0.2743       146
+
+    accuracy                         0.7151      2331
+   macro avg     0.5838    0.5454    0.5554      2331
+weighted avg     0.7120    0.7151    0.7114      2331
+
+
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1229    262    37
+      1   238    407    12
+      2   47    68    31
+
+    
+
+    Classification Report (Val, Version: bottleneckBERT, Epoch 11):
+
+                  precision    recall  f1-score   support
+
+           0     0.7996    0.8567    0.8272      1528
+           1     0.6080    0.5571    0.5814       657
+           2     0.3370    0.2123    0.2605       146
+
+    accuracy                         0.7319      2331
+   macro avg     0.5815    0.5420    0.5564      2331
+weighted avg     0.7166    0.7319    0.7224      2331
+
+
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1309    178    41
+      1   271    366    20
+      2   57    58    31
+
+    
+
+    Classification Report (Val, Version: bottleneckBERT, Epoch 12):
+
+                  precision    recall  f1-score   support
+
+           0     0.8001    0.8619    0.8299      1528
+           1     0.6233    0.5616    0.5909       657
+           2     0.3656    0.2329    0.2845       146
+
+    accuracy                         0.7379      2331
+   macro avg     0.5963    0.5521    0.5684      2331
+weighted avg     0.7231    0.7379    0.7283      2331
+
+
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1317    171    40
+      1   269    369    19
+      2   60    52    34
+
+    
+
+    Classification Report (Val, Version: bottleneckBERT, Epoch 13):
+
+                  precision    recall  f1-score   support
+
+           0     0.8184    0.7520    0.7838      1528
+           1     0.5222    0.6454    0.5773       657
+           2     0.3565    0.2808    0.3142       146
+
+    accuracy                         0.6924      2331
+   macro avg     0.5657    0.5594    0.5584      2331
+weighted avg     0.7060    0.6924    0.6961      2331
+
+
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1149    328    51
+      1   210    424    23
+      2   45    60    41
+
+    
+
+    Classification Report (Val, Version: bottleneckBERT, Epoch 14):
+
+                  precision    recall  f1-score   support
+
+           0     0.8075    0.8017    0.8046      1528
+           1     0.5439    0.6317    0.5845       657
+           2     0.4510    0.1575    0.2335       146
+
+    accuracy                         0.7134      2331
+   macro avg     0.6008    0.5303    0.5409      2331
+weighted avg     0.7109    0.7134    0.7068      2331
+
+
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1225    281    22
+      1   236    415    6
+      2   56    67    23
+
+    
+
+    Classification Report (Val, Version: bottleneckBERT, Epoch 15):
+
+                  precision    recall  f1-score   support
+
+           0     0.7985    0.8613    0.8287      1528
+           1     0.6095    0.5677    0.5879       657
+           2     0.4085    0.1986    0.2673       146
+
+    accuracy                         0.7370      2331
+   macro avg     0.6055    0.5425    0.5613      2331
+weighted avg     0.7208    0.7370    0.7257      2331
+
+
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1316    182    30
+      1   272    373    12
+      2   60    57    29
+
+    
+
+    Classification Report (Val, Version: bottleneckBERT, Epoch 16):
+
+                  precision    recall  f1-score   support
+
+           0     0.7955    0.8757    0.8336      1528
+           1     0.6416    0.5449    0.5893       657
+           2     0.3407    0.2123    0.2616       146
+
+    accuracy                         0.7409      2331
+   macro avg     0.5926    0.5443    0.5615      2331
+weighted avg     0.7236    0.7409    0.7289      2331
+
+
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1338    150    40
+      1   279    358    20
+      2   65    50    31
+
+    
+
+    Classification Report (Test Set 1, Version: bottleneckBERT, Epoch Final):
+
+                  precision    recall  f1-score   support
+
+           0     0.7999    0.8778    0.8370      1375
+           1     0.6501    0.5533    0.5978       591
+           2     0.3294    0.2137    0.2593       131
+
+    accuracy                         0.7449      2097
+   macro avg     0.5931    0.5483    0.5647      2097
+weighted avg     0.7283    0.7449    0.7335      2097
+
+
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1207    131    37
+      1   244    327    20
+      2   58    45    28
+
+    
+
+    Classification Report (Test Set 2, Version: bottleneckBERT, Epoch Final):
+
+                  precision    recall  f1-score   support
+
+           0     0.7975    0.8764    0.8351      1375
+           1     0.6436    0.5499    0.5931       591
+           2     0.3333    0.2061    0.2547       131
+
+    accuracy                         0.7425      2097
+   macro avg     0.5915    0.5441    0.5609      2097
+weighted avg     0.7251    0.7425    0.7306      2097
+
+
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1205    134    36
+      1   248    325    18
+      2   58    46    27
+
+    
+
+    Classification Report (Test Set 3, Version: bottleneckBERT, Epoch Final):
+
+                  precision    recall  f1-score   support
+
+           0     0.7991    0.8735    0.8346      1375
+           1     0.6387    0.5533    0.5929       591
+           2     0.3537    0.2214    0.2723       131
+
+    accuracy                         0.7425      2097
+   macro avg     0.5971    0.5494    0.5666      2097
+weighted avg     0.7260    0.7425    0.7314      2097
+
+
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1201    140    34
+      1   245    327    19
+      2   57    45    29
+
+    
+
+    Classification Report (Test Set 4, Version: bottleneckBERT, Epoch Final):
+
+                  precision    recall  f1-score   support
+
+           0     0.7931    0.8727    0.8310      1375
+           1     0.6302    0.5364    0.5795       591
+           2     0.3210    0.1985    0.2453       131
+
+    accuracy                         0.7358      2097
+   macro avg     0.5814    0.5359    0.5519      2097
+weighted avg     0.7177    0.7358    0.7236      2097
+
+
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1200    140    35
+      1   254    317    20
+      2   59    46    26
+
+    
+
+    Classification Report (Test Set 5, Version: bottleneckBERT, Epoch Final):
+
+                  precision    recall  f1-score   support
+
+           0     0.7928    0.8764    0.8325      1375
+           1     0.6342    0.5398    0.5832       591
+           2     0.3514    0.1985    0.2537       131
+
+    accuracy                         0.7392      2097
+   macro avg     0.5928    0.5382    0.5564      2097
+weighted avg     0.7205    0.7392    0.7261      2097
+
+
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1205    139    31
+      1   255    319    17
+      2   60    45    26
+
+    
+
+    Classification Report (Test Set 6, Version: bottleneckBERT, Epoch Final):
+
+                  precision    recall  f1-score   support
+
+           0     0.7942    0.8756    0.8329      1375
+           1     0.6398    0.5381    0.5846       591
+           2     0.3452    0.2214    0.2698       131
+
+    accuracy                         0.7396      2097
+   macro avg     0.5931    0.5450    0.5624      2097
+weighted avg     0.7226    0.7396    0.7278      2097
+
+
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1204    136    35
+      1   253    318    20
+      2   59    43    29
+
+    
+
+    Classification Report (Test Set 7, Version: bottleneckBERT, Epoch Final):
+
+                  precision    recall  f1-score   support
+
+           0     0.7943    0.8764    0.8333      1375
+           1     0.6378    0.5364    0.5827       591
+           2     0.3133    0.1985    0.2430       131
+
+    accuracy                         0.7382      2097
+   macro avg     0.5818    0.5371    0.5530      2097
+weighted avg     0.7202    0.7382    0.7258      2097
+
+
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1205    131    39
+      1   256    317    18
+      2   56    49    26
+
+    
+
+    Classification Report (Test Set 8, Version: bottleneckBERT, Epoch Final):
+
+                  precision    recall  f1-score   support
+
+           0     0.8019    0.8771    0.8378      1375
+           1     0.6424    0.5533    0.5945       591
+           2     0.3452    0.2214    0.2698       131
+
+    accuracy                         0.7449      2097
+   macro avg     0.5965    0.5506    0.5674      2097
+weighted avg     0.7284    0.7449    0.7338      2097
+
+
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1206    134    35
+      1   244    327    20
+      2   54    48    29
+
+    
+
+    Classification Report (Test Set 9, Version: bottleneckBERT, Epoch Final):
+
+                  precision    recall  f1-score   support
+
+           0     0.7974    0.8756    0.8347      1375
+           1     0.6394    0.5431    0.5874       591
+           2     0.3529    0.2290    0.2778       131
+
+    accuracy                         0.7415      2097
+   macro avg     0.5966    0.5493    0.5666      2097
+weighted avg     0.7251    0.7415    0.7302      2097
+
+
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1204    134    37
+      1   252    321    18
+      2   54    47    30
+
+    
+
+    Classification Report (Test Set 10, Version: bottleneckBERT, Epoch Final):
+
+                  precision    recall  f1-score   support
+
+           0     0.7954    0.8764    0.8339      1375
+           1     0.6475    0.5533    0.5967       591
+           2     0.3766    0.2214    0.2788       131
+
+    accuracy                         0.7444      2097
+   macro avg     0.6065    0.5503    0.5698      2097
+weighted avg     0.7275    0.7444    0.7324      2097
+
+
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1205    136    34
+      1   250    327    14
+      2   60    42    29
+
+    
+Averaged performance across all test sets:
+precision_0_avg: 0.7965 +/- 0.0029
+precision_0_std: 0.0029 +/- 0.0029
+recall_0_avg: 0.8758 +/- 0.0015
+recall_0_std: 0.0015 +/- 0.0015
+f1-score_0_avg: 0.8343 +/- 0.0019
+f1-score_0_std: 0.0019 +/- 0.0019
+support_0_avg: 1375.0000 +/- 0.0000
+support_0_std: 0.0000 +/- 0.0000
+precision_1_avg: 0.6404 +/- 0.0056
+precision_1_std: 0.0056 +/- 0.0056
+recall_1_avg: 0.5457 +/- 0.0072
+recall_1_std: 0.0072 +/- 0.0072
+f1-score_1_avg: 0.5892 +/- 0.0062
+f1-score_1_std: 0.0062 +/- 0.0062
+support_1_avg: 591.0000 +/- 0.0000
+support_1_std: 0.0000 +/- 0.0000
+precision_2_avg: 0.3422 +/- 0.0175
+precision_2_std: 0.0175 +/- 0.0175
+recall_2_avg: 0.2130 +/- 0.0110
+recall_2_std: 0.0110 +/- 0.0110
+f1-score_2_avg: 0.2624 +/- 0.0124
+f1-score_2_std: 0.0124 +/- 0.0124
+support_2_avg: 131.0000 +/- 0.0000
+support_2_std: 0.0000 +/- 0.0000
+
+
+    Classification Report (Test Set 1, Version: bottleneckBERT, Epoch Final):
+
+                  precision    recall  f1-score   support
+
+           0     0.7999    0.8778    0.8370      1375
+           1     0.6501    0.5533    0.5978       591
+           2     0.3294    0.2137    0.2593       131
+
+    accuracy                         0.7449      2097
+   macro avg     0.5931    0.5483    0.5647      2097
+weighted avg     0.7283    0.7449    0.7335      2097
+
+
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1207    131    37
+      1   244    327    20
+      2   58    45    28
+
+    
+
+    Classification Report (Test Set 2, Version: bottleneckBERT, Epoch Final):
+
+                  precision    recall  f1-score   support
+
+           0     0.7975    0.8764    0.8351      1375
+           1     0.6436    0.5499    0.5931       591
+           2     0.3333    0.2061    0.2547       131
+
+    accuracy                         0.7425      2097
+   macro avg     0.5915    0.5441    0.5609      2097
+weighted avg     0.7251    0.7425    0.7306      2097
+
+
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1205    134    36
+      1   248    325    18
+      2   58    46    27
+
+    
+
+    Classification Report (Test Set 3, Version: bottleneckBERT, Epoch Final):
+
+                  precision    recall  f1-score   support
+
+           0     0.7991    0.8735    0.8346      1375
+           1     0.6387    0.5533    0.5929       591
+           2     0.3537    0.2214    0.2723       131
+
+    accuracy                         0.7425      2097
+   macro avg     0.5971    0.5494    0.5666      2097
+weighted avg     0.7260    0.7425    0.7314      2097
+
+
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1201    140    34
+      1   245    327    19
+      2   57    45    29
+
+    
+
+    Classification Report (Test Set 4, Version: bottleneckBERT, Epoch Final):
+
+                  precision    recall  f1-score   support
+
+           0     0.7931    0.8727    0.8310      1375
+           1     0.6302    0.5364    0.5795       591
+           2     0.3210    0.1985    0.2453       131
+
+    accuracy                         0.7358      2097
+   macro avg     0.5814    0.5359    0.5519      2097
+weighted avg     0.7177    0.7358    0.7236      2097
+
+
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1200    140    35
+      1   254    317    20
+      2   59    46    26
+
+    
+
+    Classification Report (Test Set 5, Version: bottleneckBERT, Epoch Final):
+
+                  precision    recall  f1-score   support
+
+           0     0.7928    0.8764    0.8325      1375
+           1     0.6342    0.5398    0.5832       591
+           2     0.3514    0.1985    0.2537       131
+
+    accuracy                         0.7392      2097
+   macro avg     0.5928    0.5382    0.5564      2097
+weighted avg     0.7205    0.7392    0.7261      2097
+
+
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1205    139    31
+      1   255    319    17
+      2   60    45    26
+
+    
+
+    Classification Report (Test Set 6, Version: bottleneckBERT, Epoch Final):
+
+                  precision    recall  f1-score   support
+
+           0     0.7942    0.8756    0.8329      1375
+           1     0.6398    0.5381    0.5846       591
+           2     0.3452    0.2214    0.2698       131
+
+    accuracy                         0.7396      2097
+   macro avg     0.5931    0.5450    0.5624      2097
+weighted avg     0.7226    0.7396    0.7278      2097
+
+
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1204    136    35
+      1   253    318    20
+      2   59    43    29
+
+    
+
+    Classification Report (Test Set 7, Version: bottleneckBERT, Epoch Final):
+
+                  precision    recall  f1-score   support
+
+           0     0.7943    0.8764    0.8333      1375
+           1     0.6378    0.5364    0.5827       591
+           2     0.3133    0.1985    0.2430       131
+
+    accuracy                         0.7382      2097
+   macro avg     0.5818    0.5371    0.5530      2097
+weighted avg     0.7202    0.7382    0.7258      2097
+
+
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1205    131    39
+      1   256    317    18
+      2   56    49    26
+
+    
+
+    Classification Report (Test Set 8, Version: bottleneckBERT, Epoch Final):
+
+                  precision    recall  f1-score   support
+
+           0     0.8019    0.8771    0.8378      1375
+           1     0.6424    0.5533    0.5945       591
+           2     0.3452    0.2214    0.2698       131
+
+    accuracy                         0.7449      2097
+   macro avg     0.5965    0.5506    0.5674      2097
+weighted avg     0.7284    0.7449    0.7338      2097
+
+
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1206    134    35
+      1   244    327    20
+      2   54    48    29
+
+    
+
+    Classification Report (Test Set 9, Version: bottleneckBERT, Epoch Final):
+
+                  precision    recall  f1-score   support
+
+           0     0.7974    0.8756    0.8347      1375
+           1     0.6394    0.5431    0.5874       591
+           2     0.3529    0.2290    0.2778       131
+
+    accuracy                         0.7415      2097
+   macro avg     0.5966    0.5493    0.5666      2097
+weighted avg     0.7251    0.7415    0.7302      2097
+
+
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1204    134    37
+      1   252    321    18
+      2   54    47    30
+
+    
+
+    Classification Report (Test Set 10, Version: bottleneckBERT, Epoch Final):
+
+                  precision    recall  f1-score   support
+
+           0     0.7954    0.8764    0.8339      1375
+           1     0.6475    0.5533    0.5967       591
+           2     0.3766    0.2214    0.2788       131
+
+    accuracy                         0.7444      2097
+   macro avg     0.6065    0.5503    0.5698      2097
+weighted avg     0.7275    0.7444    0.7324      2097
+
+
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1205    136    34
+      1   250    327    14
+      2   60    42    29
+
+    
+Averaged performance across all test sets:
+precision_0_avg: 0.7965 +/- 0.0029
+precision_0_std: 0.0029 +/- 0.0029
+recall_0_avg: 0.8758 +/- 0.0015
+recall_0_std: 0.0015 +/- 0.0015
+f1-score_0_avg: 0.8343 +/- 0.0019
+f1-score_0_std: 0.0019 +/- 0.0019
+support_0_avg: 1375.0000 +/- 0.0000
+support_0_std: 0.0000 +/- 0.0000
+precision_1_avg: 0.6404 +/- 0.0056
+precision_1_std: 0.0056 +/- 0.0056
+recall_1_avg: 0.5457 +/- 0.0072
+recall_1_std: 0.0072 +/- 0.0072
+f1-score_1_avg: 0.5892 +/- 0.0062
+f1-score_1_std: 0.0062 +/- 0.0062
+support_1_avg: 591.0000 +/- 0.0000
+support_1_std: 0.0000 +/- 0.0000
+precision_2_avg: 0.3422 +/- 0.0175
+precision_2_std: 0.0175 +/- 0.0175
+recall_2_avg: 0.2130 +/- 0.0110
+recall_2_std: 0.0110 +/- 0.0110
+f1-score_2_avg: 0.2624 +/- 0.0124
+f1-score_2_std: 0.0124 +/- 0.0124
+support_2_avg: 131.0000 +/- 0.0000
+support_2_std: 0.0000 +/- 0.0000
+
+
+    Classification Report (Test, Version: bottleneckBERT, Epoch Final):
+
+                  precision    recall  f1-score   support
+
+           0     0.7955    0.8757    0.8336      1528
+           1     0.6416    0.5449    0.5893       657
+           2     0.3407    0.2123    0.2616       146
+
+    accuracy                         0.7409      2331
+   macro avg     0.5926    0.5443    0.5615      2331
+weighted avg     0.7236    0.7409    0.7289      2331
+
+
+    
+Confusion Matrix:
+            Predicted
+           0    1    2
+Actual
+      0   1338    150    40
+      1   279    358    20
+      2   65    50    31
+
+    
