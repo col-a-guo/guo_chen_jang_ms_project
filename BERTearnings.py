@@ -33,7 +33,7 @@ if __name__ == "__main__":
     target_lr = 8e-6 #Target after 10 epochs
     default_eps = 6.748313060587885e-08
     default_batch_size = 32
-    num_epochs = 20
+    num_epochs = 200
     patience = 4 
     warmup_proportion = 0.2
 
@@ -197,7 +197,7 @@ if __name__ == "__main__":
             elif version == "businessBERT":
                 self.bert = AutoModel.from_pretrained('pborchert/BusinessBERT')
             elif version == "bottleneckBERT":
-                self.bert = AutoModel.from_pretrained('colaguo/working')
+                self.bert = AutoModel.from_pretrained('colaguo/bottleneckBERTsmall')
             else:
                 raise ValueError(f"Invalid model version: {version}")
             
