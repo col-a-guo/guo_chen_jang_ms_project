@@ -205,7 +205,7 @@ if __name__ == "__main__":
             
             #First linear layer, key features sent to 16 params
             self.linear_features = nn.Sequential(
-                nn.Linear(11, 16),
+                nn.Linear(13, 16),
                 nn.ReLU()
             )
 
@@ -341,8 +341,8 @@ if __name__ == "__main__":
             input_ids = torch.tensor(item['input_ids'])
             attention_mask = torch.tensor(item['attention_mask'])
             label = torch.tensor(item['label'], dtype=torch.long)
-            features = torch.tensor([item['scarcity'], item['nonuniform_progress'], item['performance_constraints'], item['user_heterogeneity'], item['cognitive'], item['external'], item['internal'], item['coordination'], item['transactional'], item['technical'], item['demand']], dtype=torch.float)
-
+            features = torch.tensor([item['year'], item['word_count'], item['scarcity'], item['nonuniform_progress'], item['performance_constraints'], item['user_heterogeneity'], item['cognitive'], item['external'], item['internal'], item['coordination'], item['transactional'], item['technical'], item['demand']], dtype=torch.float)
+  
             # Extract the one-hot encoded Bottid features
             Bottid_encoded = torch.tensor([item[f"Bottid_{i}"] for i in range(self.Bottid_categories)], dtype=torch.float)
 
