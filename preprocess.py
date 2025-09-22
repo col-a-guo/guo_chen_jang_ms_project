@@ -1,11 +1,11 @@
 import pandas as pd
 from scipy.stats.mstats import winsorize
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split 
 import numpy as np
 
 # List of file paths
 og_paths = [
-    r"sept1_multichannel_combined.csv",
+    r"sept22_multichannel_combined.csv",
     r"sept1_streaming_combined.csv"
 ]
 
@@ -73,7 +73,8 @@ columns_to_keep = [
         "demand",
         "paragraph", #Special
         "label", #Y
-        "Bottid"
+        "Bottid",
+        "year",
         #"source", "length_approx", "singlebott" #Control/utility
 ]
 data = data[columns_to_keep].fillna(0)
@@ -81,6 +82,7 @@ data = data[columns_to_keep].fillna(0)
 # "word_count" - Counts words by spaces in "paragraph" and winsorizes outliers
 data["word_count"] = data["paragraph"].str.count(" ") + 1
 data["word_count"] = winsorize(data["word_count"], limits=[0.05, 0.05])
+data["year"] = (data["year"] - data["year"].min()) / (data["year"].max() - data["year"].min())    
 # "number_of_types" - Calculates the sum of the specified columns and divides by 10
 type_columns = [
     "scarcity", "nonuniform_progress", "performance_constraints",
@@ -98,11 +100,11 @@ data["number_of_types"] = data[type_columns].sum(axis=1) / 10
 print(data)
 
 # Save the combined data
-data.to_csv("sept1_combined.csv", index=False)
+data.to_csv("sept22_combined.csv", index=False)
 
 # Split into train and test datasets
 train_df, test_df = train_test_split(data, test_size=0.3, random_state=1)
 
 # # Save the train and test datasets
-train_df.to_csv("train_sept1_combined.csv", index=False)
-test_df.to_csv("test_sept1_combined.csv", index=False)
+train_df.to_csv("train_sept22_combined.csv", index=False)
+test_df.to_csv("test_sept22_combined.csv", index=False)
