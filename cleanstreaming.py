@@ -17,7 +17,7 @@ def process_stage(stage_value):
             if isinstance(parsed_list, list):
                 # Calculate the average of the list elements
                 numeric_list = [float(x) for x in parsed_list]  # Ensure elements are float
-                return float(sum(numeric_list) / len(numeric_list))
+                return max(numeric_list)
         except (ValueError, SyntaxError):
             # If parsing as a list fails, try converting directly to float
             try:
@@ -82,7 +82,7 @@ if combined_df_list:
         if 'stage' in cols:  # Check if 'stage' exists before attempting to move it
             cols.insert(0, cols.pop(cols.index('stage')))
             combined_df = combined_df[cols]
-        output_path =  r'sept22_streaming_combined.csv' # Output to the same directory
+        output_path =  r'nov_8_streaming_combined.csv' # Output to the same directory
         combined_df.to_csv(output_path, index=False)
         print(f"All XLSXs combined and cleaned into {output_path}")
     except Exception as e:
