@@ -2,13 +2,16 @@ import pandas as pd
 import os
 from pathlib import Path
 from collections import defaultdict
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 # Directory containing the Excel files
-input_dir = r"C:\Users\r2d2go\Downloads\drive-download-20251119T183135Z-1-001"
-output_file = r"C:\Users\r2d2go\Downloads\combined_output.csv"
-stage_output = r"C:\Users\r2d2go\Downloads\stage_counts.csv"
-Bottid_output = r"C:\Users\r2d2go\Downloads\Bottid_counts.csv"
-feature_output = r"C:\Users\r2d2go\Downloads\feature_counts.csv"
+
+input_dir = r"C:\Users\r2d2go\Downloads\drive-download-20251119T181704Z-1-001"
+output_file = r"C:\Users\r2d2go\Downloads\combined_output_mcn.csv"
+stage_output = r"C:\Users\r2d2go\Downloads\stage_counts_mcn.csv"
+bottid_output = r"C:\Users\r2d2go\Downloads\bottid_counts_mcn.csv"
+feature_output = r"C:\Users\r2d2go\Downloads\feature_counts_mcn.csv"
 
 # List to store all dataframes
 all_dfs = []
@@ -62,34 +65,32 @@ else:
         print(f"Stage counts saved to: {stage_output}")
         
         # === BOTTID CSV ===
-        Bottid_counts = defaultdict(lambda: defaultdict(int))
-        all_Bottids = set()
+        bottid_counts = defaultdict(lambda: defaultdict(int))
+        all_bottids = set()
         
         for _, row in combined_df.iterrows():
             year = row.get('year')
-            Bottid_val = str(row.get('Bottid', ''))
-            if pd.notna(year) and year in years and Bottid_val != 'nan':
-                # Split by comma and count each Bottid
-                for bid in Bottid_val.split(','):
+            bottid_val = str(row.get('Bottid', ''))  # Capital B
+            if pd.notna(year) and year in years and bottid_val != 'nan':
+                # Split by comma and count each bottid
+                for bid in bottid_val.split(','):
                     bid = bid.strip()
-                    if bid:
-                        all_Bottids.add(bid)
-                        Bottid_counts[year][bid] += 1
+                    # Only add if it's a valid integer (filters out dates/garbage)
+                    if bid and bid.isdigit():
+                        all_bottids.add(bid)
+                        bottid_counts[year][bid] += 1
         
-        # Sort Bottids numerically if possible
-        try:
-            sorted_Bottids = sorted(all_Bottids, key=lambda x: int(x))
-        except ValueError:
-            sorted_Bottids = sorted(all_Bottids)
+        # Sort bottids numerically (1-30)
+        sorted_bottids = sorted(all_bottids, key=lambda x: int(x))
         
-        Bottid_df = pd.DataFrame(index=years, columns=[f'Bottid_{b}' for b in sorted_Bottids])
-        Bottid_df = Bottid_df.fillna(0)
+        bottid_df = pd.DataFrame(index=years, columns=[f'bottid_{b}' for b in sorted_bottids])
+        bottid_df = bottid_df.fillna(0)
         for year in years:
-            for bid in sorted_Bottids:
-                Bottid_df.loc[year, f'Bottid_{bid}'] = Bottid_counts[year].get(bid, 0)
-        Bottid_df.index.name = 'year'
-        Bottid_df.to_csv(Bottid_output)
-        print(f"Bottid counts saved to: {Bottid_output}")
+            for bid in sorted_bottids:
+                bottid_df.loc[year, f'bottid_{bid}'] = bottid_counts[year].get(bid, 0)
+        bottid_df.index.name = 'year'
+        bottid_df.to_csv(bottid_output)
+        print(f"Bottid counts saved to: {bottid_output}")
         
         # === FEATURE CSV ===
         feature_cols = [
@@ -116,6 +117,25 @@ else:
         feature_df.index.name = 'year'
         feature_df.to_csv(feature_output)
         print(f"Feature counts saved to: {feature_output}")
+        
+        # === HEATMAPS ===
+        fig, axes = plt.subplots(1, 3, figsize=(20, 10))
+        
+        # Stage heatmap
+        sns.heatmap(stage_df.astype(int), annot=True, fmt='d', cmap='YlOrRd', ax=axes[0])
+        axes[0].set_title('Stage Counts by Year')
+        
+        
+        # Feature heatmap
+        sns.heatmap(feature_df.astype(int), annot=False, cmap='YlOrRd', ax=axes[2])
+        axes[1].set_title('Feature Counts by Year')
+        axes[1].set_xticklabels(axes[2].get_xticklabels(), rotation=45, ha='right')
+        
+        plt.tight_layout()
+        heatmap_output = r"C:\Users\r2d2go\Downloads\heatmapsmcn.png"
+        plt.savefig(heatmap_output, dpi=150, bbox_inches='tight')
+        plt.show()
+        print(f"Heatmaps saved to: {heatmap_output}")
         
     else:
         print("No data to combine")
