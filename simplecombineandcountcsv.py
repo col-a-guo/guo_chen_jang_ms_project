@@ -7,7 +7,7 @@ from collections import defaultdict
 input_dir = r"C:\Users\r2d2go\Downloads\drive-download-20251119T183135Z-1-001"
 output_file = r"C:\Users\r2d2go\Downloads\combined_output.csv"
 stage_output = r"C:\Users\r2d2go\Downloads\stage_counts.csv"
-bottid_output = r"C:\Users\r2d2go\Downloads\bottid_counts.csv"
+Bottid_output = r"C:\Users\r2d2go\Downloads\Bottid_counts.csv"
 feature_output = r"C:\Users\r2d2go\Downloads\feature_counts.csv"
 
 # List to store all dataframes
@@ -62,34 +62,34 @@ else:
         print(f"Stage counts saved to: {stage_output}")
         
         # === BOTTID CSV ===
-        bottid_counts = defaultdict(lambda: defaultdict(int))
-        all_bottids = set()
+        Bottid_counts = defaultdict(lambda: defaultdict(int))
+        all_Bottids = set()
         
         for _, row in combined_df.iterrows():
             year = row.get('year')
-            bottid_val = str(row.get('bottid', ''))
-            if pd.notna(year) and year in years and bottid_val != 'nan':
-                # Split by comma and count each bottid
-                for bid in bottid_val.split(','):
+            Bottid_val = str(row.get('Bottid', ''))
+            if pd.notna(year) and year in years and Bottid_val != 'nan':
+                # Split by comma and count each Bottid
+                for bid in Bottid_val.split(','):
                     bid = bid.strip()
                     if bid:
-                        all_bottids.add(bid)
-                        bottid_counts[year][bid] += 1
+                        all_Bottids.add(bid)
+                        Bottid_counts[year][bid] += 1
         
-        # Sort bottids numerically if possible
+        # Sort Bottids numerically if possible
         try:
-            sorted_bottids = sorted(all_bottids, key=lambda x: int(x))
+            sorted_Bottids = sorted(all_Bottids, key=lambda x: int(x))
         except ValueError:
-            sorted_bottids = sorted(all_bottids)
+            sorted_Bottids = sorted(all_Bottids)
         
-        bottid_df = pd.DataFrame(index=years, columns=[f'bottid_{b}' for b in sorted_bottids])
-        bottid_df = bottid_df.fillna(0)
+        Bottid_df = pd.DataFrame(index=years, columns=[f'Bottid_{b}' for b in sorted_Bottids])
+        Bottid_df = Bottid_df.fillna(0)
         for year in years:
-            for bid in sorted_bottids:
-                bottid_df.loc[year, f'bottid_{bid}'] = bottid_counts[year].get(bid, 0)
-        bottid_df.index.name = 'year'
-        bottid_df.to_csv(bottid_output)
-        print(f"Bottid counts saved to: {bottid_output}")
+            for bid in sorted_Bottids:
+                Bottid_df.loc[year, f'Bottid_{bid}'] = Bottid_counts[year].get(bid, 0)
+        Bottid_df.index.name = 'year'
+        Bottid_df.to_csv(Bottid_output)
+        print(f"Bottid counts saved to: {Bottid_output}")
         
         # === FEATURE CSV ===
         feature_cols = [
