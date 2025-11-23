@@ -82,7 +82,31 @@ data = data[columns_to_keep].fillna(0)
 # "word_count" - Counts words by spaces in "paragraph" and winsorizes outliers
 data["word_count"] = data["paragraph"].str.count(" ") + 1
 data["word_count"] = winsorize(data["word_count"], limits=[0.05, 0.05])
+
+# Balance dataset by year BEFORE normalizing the year column
+print("\n=== Balancing dataset by year ===")
+year_counts = data['year'].value_counts()
+print("Entries per year (before balancing):")
+print(year_counts.sort_index())
+
+min_count = year_counts.min()
+print(f"\nMinimum entries in any year: {min_count}")
+
+# Sample min_count entries from each year
+balanced_data = data.groupby('year', group_keys=False).apply(
+    lambda x: x.sample(n=min(len(x), min_count), random_state=1)
+)
+
+print(f"\nTotal entries before balancing: {len(data)}")
+print(f"Total entries after balancing: {len(balanced_data)}")
+print("\nEntries per year (after balancing):")
+print(balanced_data['year'].value_counts().sort_index())
+
+data = balanced_data.reset_index(drop=True)
+
+# Now normalize the year column
 data["year"] = (data["year"] - data["year"].min()) / (data["year"].max() - data["year"].min())    
+
 # "number_of_types" - Calculates the sum of the specified columns and divides by 10
 type_columns = [
     "scarcity", "nonuniform_progress", "performance_constraints",
