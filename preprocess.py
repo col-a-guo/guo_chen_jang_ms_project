@@ -171,10 +171,16 @@ data["word_count"] = winsorize(data["word_count"], limits=[0.05, 0.05])
 # print(balanced_data['year'].value_counts().sort_index())
 
 # data = balanced_data.reset_index(drop=True)
+ 
+# Mark which rows have 0 (unknown) years
+unknown_mask = data["year"] == 0
 
-# Now normalize the year column
-data["year"] = (data["year"] - data["year"].min()) / (data["year"].max() - data["year"].min())    
+# Normalize
+data["year"] = (data["year"] - 2007) / (data["year"].max() - 2007)
 
+# Set the originally unknown values to 0.5
+data.loc[unknown_mask, "year"] = 0.5
+print(data["year"])
 # "number_of_types" - Calculates the sum of the specified columns and divides by 10
 type_columns = [
     "scarcity", "nonuniform_progress", "performance_constraints",
@@ -193,11 +199,11 @@ print(f"Stage 2 rows in final dataset: {len(data[data['label'] == '2.0'])}")
 print(data)
 
 # Save the combined data
-data.to_csv("dec1_combined.csv", index=False)
+data.to_csv("dec13_combined.csv", index=False)
 
 # Split into train and test datasets
 train_df, test_df = train_test_split(data, test_size=0.3, random_state=1)
 
 # # Save the train and test datasets
-train_df.to_csv("train_dec1_combined.csv", index=False)
-test_df.to_csv("test_dec1_combined.csv", index=False)
+train_df.to_csv("train_dec13_combined.csv", index=False)
+test_df.to_csv("test_dec13_combined.csv", index=False)
