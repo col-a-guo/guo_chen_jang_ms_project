@@ -150,6 +150,8 @@ columns_to_keep = [
 # "word_count" - Counts words by spaces in "paragraph" and winsorizes outliers
 data["word_count"] = data["paragraph"].str.count(" ") + 1
 data["word_count"] = winsorize(data["word_count"], limits=[0.05, 0.05])
+data["word_count"] = (data["word_count"] - data["word_count"].min()) / (data["word_count"].max() - data["word_count"].min())
+
 
 # # Balance dataset by year BEFORE normalizing the year column
 # print("\n=== Balancing dataset by year ===")
