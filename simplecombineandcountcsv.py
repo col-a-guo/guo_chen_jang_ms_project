@@ -11,6 +11,10 @@ output_file = r"C:\Users\r2d2go\Downloads\combined_output_mcn.csv"
 stage_output = r"C:\Users\r2d2go\Downloads\stage_counts_mcn.csv"
 feature_output = r"C:\Users\r2d2go\Downloads\feature_counts_mcn.csv"
 
+# Function to normalize column names (replace spaces with underscores, lowercase)
+def normalize_column_name(col):
+    return str(col).strip().replace(' ', '_').lower()
+
 # List to store all dataframes
 all_dfs = []
 
@@ -27,6 +31,8 @@ else:
         print(f"Reading: {file_path.name}")
         try:
             df = pd.read_excel(file_path)
+            # Normalize column names
+            df.columns = [normalize_column_name(col) for col in df.columns]
             df['source_file'] = file_path.name
             all_dfs.append(df)
         except Exception as e:
@@ -77,11 +83,12 @@ else:
         print(f"Stage totals: {stage_df.sum().to_dict()}")
         
         # === FEATURE CSV ===
+        # Define feature columns (all in normalized format with underscores)
         feature_cols = [
             'singlebott', 'scarcity', 'nonuniform_progress', 'performance_constraints',
             'user_heterogeneity', 'cognitive', 'external', 'internal', 'coordination',
             'transactional', 'technical', 'demand', '2500partner', 'singlepartner',
-            'content_production', 'data_center/storage', 'Internet_infra',
+            'content_production', 'data_center/storage', 'internet_infra',
             'content_distribution', 'browsers,_apps_&_smart_devices', 'advertising',
             'end_users', 'external_partners', 'substitutional_partners'
         ]
@@ -116,8 +123,29 @@ else:
         print(f"Feature counts saved to: {feature_output}")
         print(f"Feature totals: {feature_df.sum().to_dict()}")
         
+        # === BOTTID CSV ===
+        bottid_output = r"C:\Users\r2d2go\Downloads\bottid_counts_mcn.csv"
+        bottid_ids = [str(i) for i in range(1, 31)]  # 1-30
+        bottid_counts = {year: {bid: 0 for bid in bottid_ids} for year in years}
+        
+        for _, row in combined_df.iterrows():
+            year = row.get('year')
+            bottid_val = str(row.get('bottid', ''))
+            if pd.notna(year) and int(year) in years:
+                # Split by comma and check each bottid
+                for bid in bottid_ids:
+                    if bid in [x.strip() for x in bottid_val.split(',')]:
+                        bottid_counts[int(year)][bid] += 1
+        
+        bottid_df = pd.DataFrame(bottid_counts).T
+        bottid_df.index.name = 'year'
+        bottid_df.columns = [f'bottid_{bid}' for bid in bottid_ids]
+        bottid_df.to_csv(bottid_output)
+        print(f"Bottid counts saved to: {bottid_output}")
+        print(f"Bottid totals: {bottid_df.sum().to_dict()}")
+        
         # === HEATMAPS ===
-        fig, axes = plt.subplots(1, 2, figsize=(16, 10))
+        fig, axes = plt.subplots(1, 3, figsize=(24, 10))
         
         # Stage heatmap
         sns.heatmap(stage_df.astype(int), annot=True, fmt='d', cmap='YlOrRd', ax=axes[0])
@@ -128,8 +156,13 @@ else:
         axes[1].set_title('Feature Counts by Year')
         axes[1].set_xticklabels(axes[1].get_xticklabels(), rotation=45, ha='right')
         
+        # Bottid heatmap
+        sns.heatmap(bottid_df.astype(int), annot=False, cmap='YlOrRd', ax=axes[2])
+        axes[2].set_title('Bottid Counts by Year')
+        axes[2].set_xticklabels(axes[2].get_xticklabels(), rotation=45, ha='right')
+        
         plt.tight_layout()
-        heatmap_output = r"C:\Users\r2d2go\Downloads\heatmaps_mcn.png"
+        heatmap_output = r"C:\Users\r2d2go\Downloads\heatmaps_mcn_dec11.png"
         plt.savefig(heatmap_output, dpi=150, bbox_inches='tight')
         plt.show()
         print(f"Heatmaps saved to: {heatmap_output}")

@@ -36,7 +36,6 @@ def convert_invalid_int_strings_to_nan(val):
             return val  # Keep the valid string
         except ValueError:
             # If conversion fails, return NaN
-            print("failed to convert"+val)
             return np.nan
     return val  # If not a string, leave it as is
 
@@ -69,24 +68,34 @@ data['label'] = data['label'].apply(process_stage)
 data = data.dropna(subset=['label']) # Drop rows where 'label' became NaN
 
 # Filter out rows with label/stage of 2
-print(f"Rows before filtering stage 2: {len(data)}")
 data = data[data['label'] != 2.0]
-print(f"Rows after filtering stage 2: {len(data)}")
 
 # Round the labels based on the specified conditions
 data['label'] = data['label'].apply(lambda x: 1.0 if abs(x - 1.5) < 0.1 else (0.0 if abs(x - 0.5) < 0.1 else x))
 data['label'] = data['label'].map(lambda x: f"{x:.1f}")
-
+columns_to_keep = [
+        "scarcity", "nonuniform_progress", "performance_constraints", "user_heterogeneity", 
+        "cognitive", "external", "internal", "coordination", "transactional", "technical", 
+        "demand",
+        "paragraph", #Special
+        "label", #Y
+        "Bottid",
+        "year",
+        #"source", "length_approx", "singlebott" #Control/utility
+]
 # Now process stage 2 files
 stage_2_dataframes = []
 for i, path in enumerate(stage_2_paths):
     df = pd.read_csv(path)
+    print(f"\n=== Processing {path} ===")
+    print(f"Initial rows in file: {len(df)}")
     df['source'] = len(og_paths) + i  # Assign source continuing from og_paths
     stage_2_dataframes.append(df)
 
 # Concatenate stage 2 dataframes
 if stage_2_dataframes:
     stage_2_data = pd.concat(stage_2_dataframes, ignore_index=True)
+    print(f"\nTotal stage 2 rows before processing: {len(stage_2_data)}")
     
     # Apply the same cleaning function to stage 2 data
     stage_2_excluding_paragraph = stage_2_data.drop(columns=["paragraph"] if "paragraph" in stage_2_data.columns else []).applymap(convert_invalid_int_strings_to_nan)
@@ -96,9 +105,35 @@ if stage_2_dataframes:
     # Set label to 2 for all stage 2 rows
     stage_2_excluding_paragraph['label'] = "2.0"
     
-    # Combine with original data
-    data = pd.concat([data, stage_2_excluding_paragraph], ignore_index=True)
-    print(f"Total rows after adding stage 2 data: {len(data)}")
+    # Track which rows will be kept
+    print(f"\nStage 2 rows after cleaning: {len(stage_2_excluding_paragraph)}")
+    
+    # Check which columns are missing before filtering
+    missing_cols = [col for col in columns_to_keep if col not in stage_2_excluding_paragraph.columns]
+    if missing_cols:
+        print(f"Missing columns in stage 2 data: {missing_cols}")
+    
+    # Filter to only keep columns that exist, then fill missing columns with 0
+    stage_2_filtered = stage_2_excluding_paragraph.copy()
+    for col in columns_to_keep:
+        if col not in stage_2_filtered.columns:
+            stage_2_filtered[col] = 0
+    
+    stage_2_filtered = stage_2_filtered[columns_to_keep].fillna(0)
+    print(f"Stage 2 rows after column filtering: {len(stage_2_filtered)}")
+    
+    # Check for any rows that might be excluded
+    rows_lost = len(stage_2_data) - len(stage_2_filtered)
+    if rows_lost > 0:
+        print(f"\n WARNING: {rows_lost} stage 2 rows were lost during processing!")
+    
+    # Combine with original data (after original data has been filtered for columns)
+    data = data[columns_to_keep].fillna(0)
+    
+    print(f"\nTotal rows before adding stage 2 data: {len(data)}")
+    data = pd.concat([data, stage_2_filtered], ignore_index=True)
+    print(f"\nTotal rows after adding stage 2 data: {len(data)}")
+    print(f"Stage 2 rows in dataset: {len(data[data['label'] == '2.0'])}")
 
 # Columns to keep for further processing
 columns_to_keep = [
@@ -111,7 +146,6 @@ columns_to_keep = [
         "year",
         #"source", "length_approx", "singlebott" #Control/utility
 ]
-data = data[columns_to_keep].fillna(0)
 
 # "word_count" - Counts words by spaces in "paragraph" and winsorizes outliers
 data["word_count"] = data["paragraph"].str.count(" ") + 1
@@ -155,6 +189,7 @@ for col in type_columns:
 # Now calculate "number_of_types"
 data["number_of_types"] = data[type_columns].sum(axis=1) / 10
 
+print(f"Stage 2 rows in final dataset: {len(data[data['label'] == '2.0'])}")
 print(data)
 
 # Save the combined data
