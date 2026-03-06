@@ -27,7 +27,6 @@ if __name__ == "__main__":
     torch.cuda.manual_seed_all(seed_value)  
 
     version_list = ["businessBERT", "bert-uncased"]  
-
     # Default hyperparameters
     default_lr = 5e-5 #initial learning rate
     target_lr = 8e-6 #Target after 10 epochs

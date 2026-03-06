@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 input_dir = r"C:\Users\r2d2go\Downloads\drive-download-20251119T181704Z-1-001"
 output_file = r"C:\Users\r2d2go\Downloads\combined_output_mcn.csv"
 stage_output = r"C:\Users\r2d2go\Downloads\stage_counts_mcn.csv"
-feature_output = r"C:\Users\r2d2go\Downloads\feature_counts_mcn.csv"
+feature_output = r"C:\Users\r2d2go\Downloads\feature_counts_stream.csv"
 
 # Function to normalize column names (replace spaces with underscores, lowercase)
 def normalize_column_name(col):
