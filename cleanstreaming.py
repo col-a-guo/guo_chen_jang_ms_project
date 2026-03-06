@@ -4,7 +4,7 @@ import pandas as pd
 import ast
 import numpy as np
 
-base_dirs = [r"C:\Users\r2d2go\Downloads\drive-download-20250922T183531Z-1-001"]  # Changed base directory
+base_dirs = [r"C:\Users\r2d2go\Downloads\drive-download-20260306T084650Z-1-001"]  # Changed base directory
 
 combined_df_list = []
 
@@ -82,7 +82,7 @@ if combined_df_list:
         if 'stage' in cols:  # Check if 'stage' exists before attempting to move it
             cols.insert(0, cols.pop(cols.index('stage')))
             combined_df = combined_df[cols]
-        output_path =  r'nov_8_streaming_combined.csv' # Output to the same directory
+        output_path =  r'march_6_extra_combined.csv' # Output to the same directory
         combined_df.to_csv(output_path, index=False)
         print(f"All XLSXs combined and cleaned into {output_path}")
     except Exception as e:
