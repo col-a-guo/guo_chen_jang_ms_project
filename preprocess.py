@@ -3,28 +3,21 @@ from scipy.stats.mstats import winsorize
 from sklearn.model_selection import train_test_split 
 import numpy as np
 
-# List of file paths for stage 0 and 1
+# List of file paths
 og_paths = [
-    r"C:\Users\r2d2go\Downloads\combined_output_mcn.csv",
-    r"C:\Users\r2d2go\Downloads\combined_output_streaming.csv"
-]
-
-# List of file paths for stage 2
-stage_2_paths = [
-    r"C:\Users\r2d2go\Downloads\mcn_stage_2.csv",
-    r"C:\Users\r2d2go\Downloads\streaming_stage_2.csv"
+    r"C:\Users\r2d2go\Downloads\jangmasters\guo_chen_jang_ms_project\bonus_2023_combined.csv"
 ]
 
 # Initialize an empty list to hold dataframes
 dataframes = []
 
-# Loop through the original paths, read each CSV, and assign the source
+# Loop through the paths, read each CSV, and assign the source
 for i, path in enumerate(og_paths):
     df = pd.read_csv(path)
     df['source'] = i  # Assign source based on the index of the file path
     dataframes.append(df)
 
-# Concatenate original dataframes
+# Concatenate all dataframes
 data = pd.concat(dataframes, ignore_index=True)
 
 # Function to check if a string can be converted to a float, else convert to NaN
@@ -36,6 +29,7 @@ def convert_invalid_int_strings_to_nan(val):
             return val  # Keep the valid string
         except ValueError:
             # If conversion fails, return NaN
+            print("failed to convert"+val)
             return np.nan
     return val  # If not a string, leave it as is
 
@@ -67,73 +61,9 @@ def process_stage(stage):
 data['label'] = data['label'].apply(process_stage)
 data = data.dropna(subset=['label']) # Drop rows where 'label' became NaN
 
-# Filter out rows with label/stage of 2
-data = data[data['label'] != 2.0]
-
 # Round the labels based on the specified conditions
 data['label'] = data['label'].apply(lambda x: 1.0 if abs(x - 1.5) < 0.1 else (0.0 if abs(x - 0.5) < 0.1 else x))
 data['label'] = data['label'].map(lambda x: f"{x:.1f}")
-columns_to_keep = [
-        "scarcity", "nonuniform_progress", "performance_constraints", "user_heterogeneity", 
-        "cognitive", "external", "internal", "coordination", "transactional", "technical", 
-        "demand",
-        "paragraph", #Special
-        "label", #Y
-        "Bottid",
-        "year",
-        #"source", "length_approx", "singlebott" #Control/utility
-]
-# Now process stage 2 files
-stage_2_dataframes = []
-for i, path in enumerate(stage_2_paths):
-    df = pd.read_csv(path)
-    print(f"\n=== Processing {path} ===")
-    print(f"Initial rows in file: {len(df)}")
-    df['source'] = len(og_paths) + i  # Assign source continuing from og_paths
-    stage_2_dataframes.append(df)
-
-# Concatenate stage 2 dataframes
-if stage_2_dataframes:
-    stage_2_data = pd.concat(stage_2_dataframes, ignore_index=True)
-    print(f"\nTotal stage 2 rows before processing: {len(stage_2_data)}")
-    
-    # Apply the same cleaning function to stage 2 data
-    stage_2_excluding_paragraph = stage_2_data.drop(columns=["paragraph"] if "paragraph" in stage_2_data.columns else []).applymap(convert_invalid_int_strings_to_nan)
-    if "paragraph" in stage_2_data.columns:
-        stage_2_excluding_paragraph["paragraph"] = stage_2_data["paragraph"]
-    
-    # Set label to 2 for all stage 2 rows
-    stage_2_excluding_paragraph['label'] = "2.0"
-    
-    # Track which rows will be kept
-    print(f"\nStage 2 rows after cleaning: {len(stage_2_excluding_paragraph)}")
-    
-    # Check which columns are missing before filtering
-    missing_cols = [col for col in columns_to_keep if col not in stage_2_excluding_paragraph.columns]
-    if missing_cols:
-        print(f"Missing columns in stage 2 data: {missing_cols}")
-    
-    # Filter to only keep columns that exist, then fill missing columns with 0
-    stage_2_filtered = stage_2_excluding_paragraph.copy()
-    for col in columns_to_keep:
-        if col not in stage_2_filtered.columns:
-            stage_2_filtered[col] = 0
-    
-    stage_2_filtered = stage_2_filtered[columns_to_keep].fillna(0)
-    print(f"Stage 2 rows after column filtering: {len(stage_2_filtered)}")
-    
-    # Check for any rows that might be excluded
-    rows_lost = len(stage_2_data) - len(stage_2_filtered)
-    if rows_lost > 0:
-        print(f"\n WARNING: {rows_lost} stage 2 rows were lost during processing!")
-    
-    # Combine with original data (after original data has been filtered for columns)
-    data = data[columns_to_keep].fillna(0)
-    
-    print(f"\nTotal rows before adding stage 2 data: {len(data)}")
-    data = pd.concat([data, stage_2_filtered], ignore_index=True)
-    print(f"\nTotal rows after adding stage 2 data: {len(data)}")
-    print(f"Stage 2 rows in dataset: {len(data[data['label'] == '2.0'])}")
 
 # Columns to keep for further processing
 columns_to_keep = [
@@ -146,43 +76,36 @@ columns_to_keep = [
         "year",
         #"source", "length_approx", "singlebott" #Control/utility
 ]
+data = data[columns_to_keep].fillna(0)
 
 # "word_count" - Counts words by spaces in "paragraph" and winsorizes outliers
 data["word_count"] = data["paragraph"].str.count(" ") + 1
 data["word_count"] = winsorize(data["word_count"], limits=[0.05, 0.05])
-data["word_count"] = (data["word_count"] - data["word_count"].min()) / (data["word_count"].max() - data["word_count"].min())
 
+# Balance dataset by year BEFORE normalizing the year column
+print("\n=== Balancing dataset by year ===")
+year_counts = data['year'].value_counts()
+print("Entries per year (before balancing):")
+print(year_counts.sort_index())
 
-# # Balance dataset by year BEFORE normalizing the year column
-# print("\n=== Balancing dataset by year ===")
-# year_counts = data['year'].value_counts()
-# print("Entries per year (before balancing):")
-# print(year_counts.sort_index())
+min_count = year_counts.min()
+print(f"\nMinimum entries in any year: {min_count}")
 
-# min_count = year_counts.min()
-# print(f"\nMinimum entries in any year: {min_count}")
+# Sample min_count entries from each year
+balanced_data = data.groupby('year', group_keys=False).apply(
+    lambda x: x.sample(n=min(len(x), min_count), random_state=1)
+)
 
-# # Sample min_count entries from each year
-# balanced_data = data.groupby('year', group_keys=False).apply(
-#     lambda x: x.sample(n=min(len(x), min_count), random_state=1)
-# )
+print(f"\nTotal entries before balancing: {len(data)}")
+print(f"Total entries after balancing: {len(balanced_data)}")
+print("\nEntries per year (after balancing):")
+print(balanced_data['year'].value_counts().sort_index())
 
-# print(f"\nTotal entries before balancing: {len(data)}")
-# print(f"Total entries after balancing: {len(balanced_data)}")
-# print("\nEntries per year (after balancing):")
-# print(balanced_data['year'].value_counts().sort_index())
+data = balanced_data.reset_index(drop=True)
 
-# data = balanced_data.reset_index(drop=True)
- 
-# Mark which rows have 0 (unknown) years
-unknown_mask = data["year"] == 0
+# Now normalize the year column
+data["year"] = (data["year"] - data["year"].min()) / (data["year"].max() - data["year"].min())    
 
-# Normalize
-data["year"] = (data["year"] - 2007) / (data["year"].max() - 2007)
-
-# Set the originally unknown values to 0.5
-data.loc[unknown_mask, "year"] = 0.5
-print(data["year"])
 # "number_of_types" - Calculates the sum of the specified columns and divides by 10
 type_columns = [
     "scarcity", "nonuniform_progress", "performance_constraints",
@@ -197,15 +120,14 @@ for col in type_columns:
 # Now calculate "number_of_types"
 data["number_of_types"] = data[type_columns].sum(axis=1) / 10
 
-print(f"Stage 2 rows in final dataset: {len(data[data['label'] == '2.0'])}")
 print(data)
 
 # Save the combined data
-data.to_csv("dec13_combined.csv", index=False)
+data.to_csv("sept1_combined.csv", index=False)
 
 # Split into train and test datasets
-train_df, test_df = train_test_split(data, test_size=0.3, random_state=1)
+train_df, test_df = train_test_split(data, test_size=0.99, random_state=1)
 
 # # Save the train and test datasets
-train_df.to_csv("train_dec13_combined.csv", index=False)
-test_df.to_csv("test_dec13_combined.csv", index=False)
+train_df.to_csv("train_bonus_combined.csv", index=False)
+test_df.to_csv("test_bonus_combined.csv", index=False)

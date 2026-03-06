@@ -110,6 +110,8 @@ def main():
         for file_path in excel_files:
             print(f"Processing file: {file_path}")
             df = process_excel_file(file_path, standardized_columns)
+            
+            df = df[df['stage'] != 'nan']
             if df is not None:
                 if not df.empty:  # Check if DataFrame is empty before adding it.
 
