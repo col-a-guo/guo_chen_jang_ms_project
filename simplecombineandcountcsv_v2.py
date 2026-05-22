@@ -29,9 +29,7 @@ heatmap_dir     = r"C:\Users\r2d2go\Downloads\heatmaps"
 
 # ── Feature columns (binary 0/1) ───────────────────────────────────────────
 FEATURE_COLS = [
-    'scarcity', 'nonuniform_progress', 'performance_constraints',
-    'user_heterogeneity', 'cognitive', 'external', 'internal',
-    'coordination', 'transactional', 'technical', 'demand'
+    "stage","year","page","article name","length of article","paragraph","2500bott","Bottid","singlebott","scarcity","nonuniform_progress","performance_constraints","user_heterogeneity","cognitive","external","internal","coordination","transactional","technical","demand","2500partner","singlepartner","content production","data center/storage","internet infra","content distribution","browsers, apps & smart devices","advertising","end users","external partners","substitutional partners"
 ]
 
 ALL_YEARS = list(range(2007, 2024))

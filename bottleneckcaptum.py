@@ -13,9 +13,9 @@ from captum.attr import LayerIntegratedGradients
 
 # ── Config ────────────────────────────────────────────────────────────────────
 DATA_PATH      = "dec13_combined.csv"
-OUTPUT_DIR     = "heatmap_outputs_st_2"
-MAX_SAMPLES    = 100
-MAX_PER_CLASS  = 34    # collect exactly this many per stage (34×3 = 102, stops at 100)
+OUTPUT_DIR     = "heatmap_outputs_mixed"
+MAX_SAMPLES    = 60
+MAX_PER_CLASS  = 20    # collect exactly this many per stage (34×3 = 102, stops at 100)
 MODEL_VERSIONS = ["bert-uncased", "businessBERT", "bottleneckBERT"]
 NUM_CLASSES    = 3          # <-- 3-class: stages 0, 1, 2
 
@@ -119,6 +119,8 @@ def load_model(version):
 # ── Tokenisation helpers ───────────────────────────────────────────────────────
 def build_input_ref(text, version):
     tok = MODEL_CACHE[(version, "tokenizer")]
+    if version == "businessBERT":
+        text = text.lower()
     ids = tok.encode(text, add_special_tokens=False)
     ids = ids[: MAX_SEQ_LEN - 2]          # leave room for [CLS] and [SEP]
     t   = TOKEN_IDS[version]
@@ -327,7 +329,7 @@ def main():
 
     # Pre-stratify: take up to N rows per class so the search is balanced.
     # Stage 2 gets more rows because bottleneckBERT-wins are rarer there.
-    CLASS_BUDGET = {0: 20, 1: 20, 2: 400}
+    CLASS_BUDGET = {0: 50, 1: 50, 2: 50}
     df = (
         df.groupby("label", group_keys=False)
           .apply(lambda g: g.sample(n=min(len(g), CLASS_BUDGET[int(g.name)]),
@@ -340,6 +342,8 @@ def main():
 
     for v in MODEL_VERSIONS:
         load_model(v)
+ 
+ 
 
     found   = 0
     row_idx = 0

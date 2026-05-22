@@ -8,3 +8,7 @@ output_bert-uncased
 colaguo
 logs
 model_output
+heatmap_outputs_mixed
+heatmap_outputs_st_2
+
+heatmap_outputs_st_1
